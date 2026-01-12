@@ -1,36 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Navigation } from '@/components/layout/Navigation';
-import { PendenciaCard } from '@/components/pendencias/PendenciaCard';
-import { mockPendencias } from '@/data/mockData';
-import { Pendencia, StatusPendencia, STATUS_PENDENCIA_LABELS } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search } from 'lucide-react';
+import { STATUS_PENDENCIA_LABELS, StatusPendencia } from '@/types';
 
 const COLUMNS: StatusPendencia[] = ['pendente', 'em_andamento', 'concluido'];
 
 const Pendencias = () => {
   const [search, setSearch] = useState('');
 
-  const filteredPendencias = useMemo(() => {
-    if (!search) return mockPendencias;
-    const s = search.toLowerCase();
-    return mockPendencias.filter(p =>
-      p.titulo.toLowerCase().includes(s) ||
-      p.emissao_codigo?.toLowerCase().includes(s) ||
-      p.responsavel?.toLowerCase().includes(s)
-    );
-  }, [search]);
-
-  const grouped = useMemo(() => {
-    const result: Record<StatusPendencia, Pendencia[]> = {
-      pendente: [],
-      em_andamento: [],
-      concluido: [],
-    };
-    filteredPendencias.forEach(p => result[p.status].push(p));
-    return result;
-  }, [filteredPendencias]);
+  // TODO: Implement real pendencias hook when table is created
+  const grouped: Record<StatusPendencia, { id: string; titulo: string }[]> = {
+    pendente: [],
+    em_andamento: [],
+    concluido: [],
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,9 +44,6 @@ const Pendencias = () => {
                 <Badge variant="secondary">{grouped[status].length}</Badge>
               </div>
               <div className="space-y-3 min-h-[200px] bg-muted/30 rounded-lg p-3">
-                {grouped[status].map(p => (
-                  <PendenciaCard key={p.id} pendencia={p} />
-                ))}
                 {grouped[status].length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-8">
                     Nenhuma pendência

@@ -7,13 +7,35 @@ import { EmissaoStats } from '@/components/emissoes/EmissaoStats';
 import { EmissaoDetailDrawer } from '@/components/emissoes/EmissaoDetailDrawer';
 import { SpreadsheetMode } from '@/components/emissoes/SpreadsheetMode';
 import { BatchEditPreviewDialog } from '@/components/emissoes/BatchEditPreviewDialog';
-import { mockEmissoes } from '@/data/mockData';
+import { useEmissoes } from '@/hooks/useEmissoes';
 import { Emissao, FilterState } from '@/types';
 import { exportEmissoesToCSV } from '@/utils/exportUtils';
-import { Table2, LayoutGrid, Download, Plus } from 'lucide-react';
+import { Table2, LayoutGrid, Download, Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { EmissaoDB } from '@/types/database';
+
+// Helper to convert DB record to Emissao type for compatibility
+const mapDBToEmissao = (db: EmissaoDB): Emissao => ({
+  id: db.id,
+  codigo: db.numero_emissao || '',
+  nome: db.nome_operacao || '',
+  tipo: 'CRI', // Default - actual type comes from categoria lookup
+  status: (db.status as Emissao['status']) || 'em_estruturacao',
+  data_emissao: undefined,
+  data_vencimento: undefined,
+  created_at: db.criado_em,
+  updated_at: db.atualizado_em,
+  valor_total: db.volume || 0,
+  originador: db.empresa_razao_social || db.empresa_nome_fantasia || '',
+  cedente: db.empresa_razao_social || db.empresa_nome_fantasia || '',
+  series: [],
+  oferta_publica: false,
+  esforcos_restritos: false,
+  pendencias_count: 0,
+});
 
 const Index = () => {
+  const { data: emissoes, isLoading, error } = useEmissoes();
   const [filters, setFilters] = useState<FilterState>({ search: '' });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedEmissao, setSelectedEmissao] = useState<Emissao | null>(null);
@@ -22,18 +44,23 @@ const Index = () => {
   const [batchChanges, setBatchChanges] = useState<Partial<Emissao>[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  const mappedEmissoes = useMemo(() => 
+    (emissoes || []).map(mapDBToEmissao),
+    [emissoes]
+  );
+
   const originadores = useMemo(() => 
-    [...new Set(mockEmissoes.map(e => e.originador))].sort(),
-    []
+    [...new Set(mappedEmissoes.map(e => e.originador).filter(Boolean))].sort(),
+    [mappedEmissoes]
   );
 
   const filteredEmissoes = useMemo(() => {
-    return mockEmissoes.filter(emissao => {
+    return mappedEmissoes.filter(emissao => {
       if (filters.search) {
         const search = filters.search.toLowerCase();
-        if (!emissao.codigo.toLowerCase().includes(search) &&
-            !emissao.nome.toLowerCase().includes(search) &&
-            !emissao.originador.toLowerCase().includes(search)) {
+        if (!emissao.codigo?.toLowerCase().includes(search) &&
+            !emissao.nome?.toLowerCase().includes(search) &&
+            !emissao.originador?.toLowerCase().includes(search)) {
           return false;
         }
       }
@@ -42,7 +69,7 @@ const Index = () => {
       if (filters.originador?.length && !filters.originador.includes(emissao.originador)) return false;
       return true;
     });
-  }, [filters]);
+  }, [filters, mappedEmissoes]);
 
   const handleRowClick = (emissao: Emissao) => {
     setSelectedEmissao(emissao);
@@ -60,6 +87,30 @@ const Index = () => {
     setSpreadsheetMode(false);
     setBatchChanges([]);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="container py-6 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="container py-6">
+          <div className="text-center text-destructive">
+            Erro ao carregar emissões: {error.message}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,7 +176,7 @@ const Index = () => {
         open={previewOpen}
         onOpenChange={setPreviewOpen}
         changes={batchChanges}
-        emissoes={mockEmissoes}
+        emissoes={mappedEmissoes}
         onConfirm={handleConfirmBatch}
       />
     </div>

@@ -9,7 +9,14 @@ export type StatusEmissao =
   | 'em_registro' 
   | 'registrado' 
   | 'liquidado' 
-  | 'cancelado';
+  | 'cancelado'
+  // DB statuses (from public.emissoes)
+  | 'rascunho'
+  | 'enviada'
+  | 'aceita'
+  | 'recusada'
+  | 'finalizada'
+  | 'estruturacao';
 
 export type StatusPendencia = 'pendente' | 'em_andamento' | 'concluido';
 
@@ -166,6 +173,13 @@ export const STATUS_LABELS: Record<StatusEmissao, string> = {
   registrado: 'Registrado',
   liquidado: 'Liquidado',
   cancelado: 'Cancelado',
+  // DB statuses
+  rascunho: 'Rascunho',
+  enviada: 'Enviada',
+  aceita: 'Aceita',
+  recusada: 'Recusada',
+  finalizada: 'Finalizada',
+  estruturacao: 'Em Estruturação',
 };
 
 export const STATUS_COLORS: Record<StatusEmissao, string> = {
@@ -176,6 +190,13 @@ export const STATUS_COLORS: Record<StatusEmissao, string> = {
   registrado: 'bg-green-100 text-green-800',
   liquidado: 'bg-gray-100 text-gray-800',
   cancelado: 'bg-red-100 text-red-800',
+  // DB statuses
+  rascunho: 'bg-gray-100 text-gray-800',
+  enviada: 'bg-blue-100 text-blue-800',
+  aceita: 'bg-green-100 text-green-800',
+  recusada: 'bg-red-100 text-red-800',
+  finalizada: 'bg-purple-100 text-purple-800',
+  estruturacao: 'bg-indigo-100 text-indigo-800',
 };
 
 export const PRIORIDADE_LABELS: Record<PrioridadePendencia, string> = {

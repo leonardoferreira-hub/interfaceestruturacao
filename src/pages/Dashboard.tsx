@@ -1,28 +1,42 @@
 import { Navigation } from '@/components/layout/Navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { mockDashboardMetrics, mockEmissoes } from '@/data/mockData';
+import { useEmissoes } from '@/hooks/useEmissoes';
 import { formatCurrencyCompact, formatNumber, formatPercent } from '@/utils/formatters';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TrendingUp, DollarSign, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { useMemo } from 'react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 const Dashboard = () => {
-  const metrics = mockDashboardMetrics;
+  const { data: emissoes, isLoading } = useEmissoes();
 
-  const tipoData = mockEmissoes.reduce((acc, e) => {
-    const existing = acc.find(x => x.name === e.tipo);
-    if (existing) existing.value++;
-    else acc.push({ name: e.tipo, value: 1 });
-    return acc;
-  }, [] as { name: string; value: number }[]);
+  const metrics = useMemo(() => ({
+    total_emissoes: emissoes?.length || 0,
+    valor_total_emitido: emissoes?.reduce((acc, e) => acc + (e.volume || 0), 0) || 0,
+    pendencias_abertas: 0,
+    taxa_conclusao_sla: 0,
+  }), [emissoes]);
 
-  const statusData = mockEmissoes.reduce((acc, e) => {
-    const existing = acc.find(x => x.name === e.status);
-    if (existing) existing.value++;
-    else acc.push({ name: e.status, value: 1 });
-    return acc;
-  }, [] as { name: string; value: number }[]);
+  const tipoData = useMemo(() => {
+    return (emissoes || []).reduce((acc, e) => {
+      const tipo = e.categoria || 'Outros';
+      const existing = acc.find(x => x.name === tipo);
+      if (existing) existing.value++;
+      else acc.push({ name: tipo, value: 1 });
+      return acc;
+    }, [] as { name: string; value: number }[]);
+  }, [emissoes]);
+
+  const statusData = useMemo(() => {
+    return (emissoes || []).reduce((acc, e) => {
+      const status = e.status || 'desconhecido';
+      const existing = acc.find(x => x.name === status);
+      if (existing) existing.value++;
+      else acc.push({ name: status, value: 1 });
+      return acc;
+    }, [] as { name: string; value: number }[]);
+  }, [emissoes]);
 
   const stats = [
     { label: 'Total Emissões', value: formatNumber(metrics.total_emissoes), icon: TrendingUp, color: 'text-blue-600' },
@@ -30,6 +44,17 @@ const Dashboard = () => {
     { label: 'Pendências Abertas', value: formatNumber(metrics.pendencias_abertas), icon: AlertTriangle, color: 'text-yellow-600' },
     { label: 'Taxa SLA', value: formatPercent(metrics.taxa_conclusao_sla), icon: CheckCircle, color: 'text-emerald-600' },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="container py-6 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
