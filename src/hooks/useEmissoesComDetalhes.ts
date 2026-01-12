@@ -23,6 +23,7 @@ export function useEmissoesComDetalhes() {
       const { data: emissoes, error: emissaoError } = await supabase
         .from('emissoes')
         .select('*')
+        .eq('status', 'em_estruturacao')
         .order('criado_em', { ascending: false });
 
       if (emissaoError) throw emissaoError;
