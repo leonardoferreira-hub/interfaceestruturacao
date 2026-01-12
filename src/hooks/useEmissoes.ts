@@ -45,7 +45,7 @@ export function useEmissoesEstruturacao() {
       const { data, error } = await supabase
         .from('emissoes')
         .select('*')
-        .eq('status', 'estruturacao')
+        .eq('status', 'em_estruturacao')
         .order('criado_em', { ascending: false });
       
       if (error) throw error;
