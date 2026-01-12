@@ -2,11 +2,10 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
   FileText, 
-  AlertTriangle, 
+  Clock, 
   History, 
   BarChart3,
   Menu,
-  X 
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -14,8 +13,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const navItems = [
   { path: '/', label: 'Emissões', icon: FileText },
-  { path: '/estruturacao', label: 'Estruturação', icon: FileText },
-  { path: '/pendencias', label: 'Pendências', icon: AlertTriangle },
+  { path: '/pendencias', label: 'Pendências', icon: Clock },
   { path: '/historico', label: 'Histórico', icon: History },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
 ];
