@@ -37,6 +37,7 @@ export function useUpdateEmissao() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['emissoes'] });
       queryClient.invalidateQueries({ queryKey: ['emissoes-estruturacao'] });
+      queryClient.invalidateQueries({ queryKey: ['emissoes-com-detalhes'] });
     },
   });
 }

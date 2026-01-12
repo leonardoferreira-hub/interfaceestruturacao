@@ -65,6 +65,7 @@ export function useUpsertDadosEstruturacao() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['dados-estruturacao', variables.idEmissao] });
+      queryClient.invalidateQueries({ queryKey: ['emissoes-com-detalhes'] });
     },
   });
 }
