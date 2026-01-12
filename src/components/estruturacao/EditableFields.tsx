@@ -221,12 +221,12 @@ export function UserSelectField({ label, value, usuarios, onSave, placeholder = 
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Select value={value || ''} onValueChange={(v) => onSave(v || null)}>
+      <Select value={value || '__none__'} onValueChange={(v) => onSave(v === '__none__' ? null : v)}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">
+          <SelectItem value="__none__">
             <span className="text-muted-foreground">{placeholder}</span>
           </SelectItem>
           {usuarios.map((usuario) => (
