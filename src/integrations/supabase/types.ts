@@ -1012,6 +1012,46 @@ export type Database = {
         Returns: string
       }
       gerar_numero_emissao: { Args: never; Returns: string }
+      get_base_custos_categorias: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+        }[]
+      }
+      get_base_custos_lastros: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+        }[]
+      }
+      get_base_custos_tipos_oferta: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+        }[]
+      }
+      get_base_custos_veiculos: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+        }[]
+      }
       obter_preco_prestador: {
         Args: {
           p_id_emissao: string
