@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      categorias: {
+        Row: {
+          codigo: string | null
+          criado_em: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          codigo?: string | null
+          criado_em?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          codigo?: string | null
+          criado_em?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       custos: {
         Row: {
           atualizado_em: string | null
@@ -331,6 +352,144 @@ export type Database = {
         }
         Relationships: []
       }
+      dados_estruturacao: {
+        Row: {
+          agencia: string | null
+          alertas: string | null
+          analista_contabil_id: string | null
+          analista_financeiro_id: string | null
+          analista_gestao_id: string | null
+          atualizado_em: string | null
+          banco: string | null
+          boletagem: string | null
+          compliance: string | null
+          conta_bancaria: string | null
+          criado_em: string | null
+          data_df: string | null
+          data_entrada_pipe: string | null
+          data_liquidacao: string | null
+          due_diligence: string | null
+          envio_email_prestadores: string | null
+          floating: boolean | null
+          id: string
+          id_emissao: string
+          investidores_obs: string | null
+          kick_off: string | null
+          lo_status: string | null
+          mapa_liquidacao: string | null
+          mapa_registros: string | null
+          passagem_bastao: string | null
+          pmo_id: string | null
+          previsao_liquidacao: string | null
+          primeira_data_pagamento: string | null
+          proximos_passos: string | null
+          resumo: string | null
+          status_tech: string | null
+        }
+        Insert: {
+          agencia?: string | null
+          alertas?: string | null
+          analista_contabil_id?: string | null
+          analista_financeiro_id?: string | null
+          analista_gestao_id?: string | null
+          atualizado_em?: string | null
+          banco?: string | null
+          boletagem?: string | null
+          compliance?: string | null
+          conta_bancaria?: string | null
+          criado_em?: string | null
+          data_df?: string | null
+          data_entrada_pipe?: string | null
+          data_liquidacao?: string | null
+          due_diligence?: string | null
+          envio_email_prestadores?: string | null
+          floating?: boolean | null
+          id?: string
+          id_emissao: string
+          investidores_obs?: string | null
+          kick_off?: string | null
+          lo_status?: string | null
+          mapa_liquidacao?: string | null
+          mapa_registros?: string | null
+          passagem_bastao?: string | null
+          pmo_id?: string | null
+          previsao_liquidacao?: string | null
+          primeira_data_pagamento?: string | null
+          proximos_passos?: string | null
+          resumo?: string | null
+          status_tech?: string | null
+        }
+        Update: {
+          agencia?: string | null
+          alertas?: string | null
+          analista_contabil_id?: string | null
+          analista_financeiro_id?: string | null
+          analista_gestao_id?: string | null
+          atualizado_em?: string | null
+          banco?: string | null
+          boletagem?: string | null
+          compliance?: string | null
+          conta_bancaria?: string | null
+          criado_em?: string | null
+          data_df?: string | null
+          data_entrada_pipe?: string | null
+          data_liquidacao?: string | null
+          due_diligence?: string | null
+          envio_email_prestadores?: string | null
+          floating?: boolean | null
+          id?: string
+          id_emissao?: string
+          investidores_obs?: string | null
+          kick_off?: string | null
+          lo_status?: string | null
+          mapa_liquidacao?: string | null
+          mapa_registros?: string | null
+          passagem_bastao?: string | null
+          pmo_id?: string | null
+          previsao_liquidacao?: string | null
+          primeira_data_pagamento?: string | null
+          proximos_passos?: string | null
+          resumo?: string | null
+          status_tech?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dados_estruturacao_analista_contabil_id_fkey"
+            columns: ["analista_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dados_estruturacao_analista_financeiro_id_fkey"
+            columns: ["analista_financeiro_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dados_estruturacao_analista_gestao_id_fkey"
+            columns: ["analista_gestao_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dados_estruturacao_id_emissao_fkey"
+            columns: ["id_emissao"]
+            isOneToOne: true
+            referencedRelation: "emissoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dados_estruturacao_pmo_id_fkey"
+            columns: ["pmo_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emissoes: {
         Row: {
           atualizado_em: string | null
@@ -452,6 +611,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lastros: {
+        Row: {
+          criado_em: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
       }
       periodicidades: {
         Row: {
@@ -687,6 +864,24 @@ export type Database = {
         }
         Relationships: []
       }
+      tipos_operacao: {
+        Row: {
+          criado_em: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       tipos_preco: {
         Row: {
           codigo: string
@@ -738,6 +933,27 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome_completo?: string
+        }
+        Relationships: []
+      }
+      veiculos: {
+        Row: {
+          criado_em: string | null
+          id: string
+          nome: string
+          sigla: string | null
+        }
+        Insert: {
+          criado_em?: string | null
+          id?: string
+          nome: string
+          sigla?: string | null
+        }
+        Update: {
+          criado_em?: string | null
+          id?: string
+          nome?: string
+          sigla?: string | null
         }
         Relationships: []
       }
