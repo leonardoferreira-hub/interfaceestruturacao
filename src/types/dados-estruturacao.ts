@@ -102,31 +102,20 @@ export const STATUS_OKNOK_COLORS: Record<StatusOkNok, string> = {
   pendente: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
 };
 
-// Tipos para lookup tables
-export interface Categoria {
-  id: string;
-  nome: string;
-  codigo: string | null;
-  criado_em: string;
-}
+// Tipos para lookup tables (usados por useLookups.ts)
+// Re-exportados do useLookups para manter compatibilidade
+export type { Categoria, Veiculo, Lastro, TipoOferta } from '@/hooks/useLookups';
 
-export interface Veiculo {
-  id: string;
-  nome: string;
-  sigla: string | null;
-  criado_em: string;
-}
+// Alias para compatibilidade
+export type TipoOperacao = import('@/hooks/useLookups').TipoOferta;
 
-export interface Lastro {
+export interface Usuario {
   id: string;
-  nome: string;
-  criado_em: string;
-}
-
-export interface TipoOperacao {
-  id: string;
-  nome: string;
-  criado_em: string;
+  nome_completo: string;
+  email: string;
+  funcao: string | null;
+  departamento: string | null;
+  ativo: boolean | null;
 }
 
 export interface Usuario {
