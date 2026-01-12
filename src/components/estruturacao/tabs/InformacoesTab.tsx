@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { useDadosEstruturacao, useUpdateCampoEstruturacao } from '@/hooks/useDadosEstruturacao';
 import { useUpdateEmissao } from '@/hooks/useUpdateEmissao';
 import { useUsuarios } from '@/hooks/useUsuarios';
-import { useCategorias, useVeiculos, useLastros, useTiposOperacao } from '@/hooks/useLookups';
+import { useCategorias, useVeiculos, useLastros, useTiposOferta } from '@/hooks/useLookups';
 import { formatCurrency } from '@/utils/formatters';
 import type { EmissaoDB } from '@/types/database';
 import type { StatusOkNok, StatusBoletagem } from '@/types/dados-estruturacao';
@@ -33,7 +33,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
   const { data: categorias = [] } = useCategorias();
   const { data: veiculos = [] } = useVeiculos();
   const { data: lastros = [] } = useLastros();
-  const { data: tiposOperacao = [] } = useTiposOperacao();
+  const { data: tiposOferta = [] } = useTiposOferta();
 
   // Handlers para campos de estruturação
   const handleUpdateEstruturacao = (campo: string, valor: unknown) => {
@@ -119,16 +119,19 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Categoria</Label>
               <Select 
-                value={emissao.categoria || ''} 
-                onValueChange={(v) => handleUpdateEmissao('categoria', v || null)}
+                value={emissao.categoria || '__none__'} 
+                onValueChange={(v) => handleUpdateEmissao('categoria', v === '__none__' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar categoria" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Selecionar categoria</span>
+                  </SelectItem>
                   {categorias.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.nome}
+                      {cat.codigo} - {cat.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -139,54 +142,66 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Veículo</Label>
               <Select 
-                value={emissao.veiculo || ''} 
-                onValueChange={(v) => handleUpdateEmissao('veiculo', v || null)}
+                value={emissao.veiculo || '__none__'} 
+                onValueChange={(v) => handleUpdateEmissao('veiculo', v === '__none__' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar veículo" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Selecionar veículo</span>
+                  </SelectItem>
                   {veiculos.map((veic) => (
                     <SelectItem key={veic.id} value={veic.id}>
-                      {veic.sigla} - {veic.nome}
+                      {veic.codigo} - {veic.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Lastro */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Lastro</Label>
-              <Select 
-                value={emissao.lastro || ''} 
-                onValueChange={(v) => handleUpdateEmissao('lastro', v || null)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar lastro" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lastros.map((lastro) => (
-                    <SelectItem key={lastro.id} value={lastro.id}>
-                      {lastro.nome}
+            {/* Lastro - apenas para CRI e CRA */}
+            {(emissao.categoria === 'b4fe5ff5-fc0d-4407-ba2a-b322f24fba17' || 
+              emissao.categoria === 'a884c86f-84ac-449b-843b-22744c21aa46') && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Lastro</Label>
+                <Select 
+                  value={emissao.lastro || '__none__'} 
+                  onValueChange={(v) => handleUpdateEmissao('lastro', v === '__none__' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar lastro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">Selecionar lastro</span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                    {lastros.map((lastro) => (
+                      <SelectItem key={lastro.id} value={lastro.id}>
+                        {lastro.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            {/* Tipo Operação */}
+            {/* Tipo Oferta */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Tipo Oferta</Label>
               <Select 
-                value={emissao.tipo_oferta || ''} 
-                onValueChange={(v) => handleUpdateEmissao('tipo_oferta', v || null)}
+                value={emissao.tipo_oferta || '__none__'} 
+                onValueChange={(v) => handleUpdateEmissao('tipo_oferta', v === '__none__' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {tiposOperacao.map((tipo) => (
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Selecionar tipo</span>
+                  </SelectItem>
+                  {tiposOferta.map((tipo) => (
                     <SelectItem key={tipo.id} value={tipo.id}>
                       {tipo.nome}
                     </SelectItem>

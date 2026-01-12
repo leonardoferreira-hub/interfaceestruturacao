@@ -39,20 +39,11 @@ export function useCategorias() {
   return useQuery({
     queryKey: ['categorias-base-custos'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc('get_base_custos_categorias');
+      // Usar RPC para buscar do base_custos
+      const { data, error } = await supabase.rpc('get_base_custos_categorias' as any);
       
-      if (error) {
-        // Fallback: query direta via SQL
-        const { data: sqlData, error: sqlError } = await supabase
-          .from('categorias')
-          .select('*')
-          .order('nome');
-        
-        if (sqlError) throw sqlError;
-        return sqlData as Categoria[];
-      }
-      return data as Categoria[];
+      if (error) throw error;
+      return (data || []) as Categoria[];
     },
   });
 }
@@ -62,20 +53,11 @@ export function useVeiculos() {
   return useQuery({
     queryKey: ['veiculos-base-custos'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc('get_base_custos_veiculos');
+      // Usar RPC para buscar do base_custos
+      const { data, error } = await supabase.rpc('get_base_custos_veiculos' as any);
       
-      if (error) {
-        // Fallback: query direta
-        const { data: sqlData, error: sqlError } = await supabase
-          .from('veiculos')
-          .select('*')
-          .order('nome');
-        
-        if (sqlError) throw sqlError;
-        return sqlData as Veiculo[];
-      }
-      return data as Veiculo[];
+      if (error) throw error;
+      return (data || []) as Veiculo[];
     },
   });
 }
@@ -85,20 +67,11 @@ export function useLastros() {
   return useQuery({
     queryKey: ['lastros-base-custos'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc('get_base_custos_lastros');
+      // Usar RPC para buscar do base_custos
+      const { data, error } = await supabase.rpc('get_base_custos_lastros' as any);
       
-      if (error) {
-        // Fallback: query direta
-        const { data: sqlData, error: sqlError } = await supabase
-          .from('lastros')
-          .select('*')
-          .order('nome');
-        
-        if (sqlError) throw sqlError;
-        return sqlData as Lastro[];
-      }
-      return data as Lastro[];
+      if (error) throw error;
+      return (data || []) as Lastro[];
     },
   });
 }
@@ -108,20 +81,11 @@ export function useTiposOferta() {
   return useQuery({
     queryKey: ['tipos-oferta-base-custos'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc('get_base_custos_tipos_oferta');
+      // Usar RPC para buscar do base_custos
+      const { data, error } = await supabase.rpc('get_base_custos_tipos_oferta' as any);
       
-      if (error) {
-        // Fallback: query direta
-        const { data: sqlData, error: sqlError } = await supabase
-          .from('tipos_operacao')
-          .select('*')
-          .order('nome');
-        
-        if (sqlError) throw sqlError;
-        return sqlData as TipoOferta[];
-      }
-      return data as TipoOferta[];
+      if (error) throw error;
+      return (data || []) as TipoOferta[];
     },
   });
 }
