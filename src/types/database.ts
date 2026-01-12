@@ -22,7 +22,8 @@ export type StatusProposta =
   | 'aceita' 
   | 'recusada' 
   | 'finalizada' 
-  | 'estruturacao';
+  | 'estruturacao'
+  | 'em_estruturacao';
 
 export const STATUS_PROPOSTA_LABELS: Record<StatusProposta, string> = {
   rascunho: 'Rascunho',
@@ -31,6 +32,7 @@ export const STATUS_PROPOSTA_LABELS: Record<StatusProposta, string> = {
   recusada: 'Recusada',
   finalizada: 'Finalizada',
   estruturacao: 'Em Estruturação',
+  em_estruturacao: 'Em Estruturação',
 };
 
 export const STATUS_PROPOSTA_COLORS: Record<StatusProposta, string> = {
@@ -40,6 +42,7 @@ export const STATUS_PROPOSTA_COLORS: Record<StatusProposta, string> = {
   recusada: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
   finalizada: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   estruturacao: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+  em_estruturacao: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
 };
 
 // ============= Emissão Estendida =============
