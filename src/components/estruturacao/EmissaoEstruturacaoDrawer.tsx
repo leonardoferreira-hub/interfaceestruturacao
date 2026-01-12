@@ -7,7 +7,8 @@ import {
   Users, 
   TrendingUp, 
   Calendar,
-  Building2
+  Building2,
+  Banknote
 } from 'lucide-react';
 import type { EmissaoDB } from '@/types/database';
 import { DocumentosTab } from './tabs/DocumentosTab';
@@ -15,6 +16,8 @@ import { InvestidoresTab } from './tabs/InvestidoresTab';
 import { FluxoCaixaTab } from './tabs/FluxoCaixaTab';
 import { EventosTab } from './tabs/EventosTab';
 import { InformacoesTab } from './tabs/InformacoesTab';
+import { SeriesTab } from './tabs/SeriesTab';
+import { DespesasTab } from './tabs/DespesasTab';
 import { formatCurrency } from '@/utils/formatters';
 
 interface EmissaoEstruturacaoDrawerProps {
@@ -32,7 +35,7 @@ export function EmissaoEstruturacaoDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl lg:max-w-4xl p-0">
+      <SheetContent className="w-full sm:max-w-3xl lg:max-w-5xl p-0">
         <SheetHeader className="px-6 py-4 border-b">
           <div className="flex items-start justify-between">
             <div>
@@ -64,10 +67,18 @@ export function EmissaoEstruturacaoDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="informacoes" className="flex flex-col h-[calc(100vh-140px)]">
-          <TabsList className="mx-6 mt-4 justify-start w-auto">
+          <TabsList className="mx-6 mt-4 justify-start w-auto flex-wrap">
             <TabsTrigger value="informacoes" className="gap-2">
               <Building2 className="h-4 w-4" />
-              Informações
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="series" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Séries
+            </TabsTrigger>
+            <TabsTrigger value="despesas" className="gap-2">
+              <Banknote className="h-4 w-4" />
+              Despesas
             </TabsTrigger>
             <TabsTrigger value="documentos" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -76,10 +87,6 @@ export function EmissaoEstruturacaoDrawer({
             <TabsTrigger value="investidores" className="gap-2">
               <Users className="h-4 w-4" />
               Investidores
-            </TabsTrigger>
-            <TabsTrigger value="fluxo" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Fluxo de Caixa
             </TabsTrigger>
             <TabsTrigger value="eventos" className="gap-2">
               <Calendar className="h-4 w-4" />
@@ -91,14 +98,17 @@ export function EmissaoEstruturacaoDrawer({
             <TabsContent value="informacoes" className="mt-0">
               <InformacoesTab emissao={emissao} />
             </TabsContent>
+            <TabsContent value="series" className="mt-0">
+              <SeriesTab idEmissao={emissao.id} />
+            </TabsContent>
+            <TabsContent value="despesas" className="mt-0">
+              <DespesasTab idEmissao={emissao.id} />
+            </TabsContent>
             <TabsContent value="documentos" className="mt-0">
               <DocumentosTab idEmissao={emissao.id} />
             </TabsContent>
             <TabsContent value="investidores" className="mt-0">
               <InvestidoresTab idEmissao={emissao.id} />
-            </TabsContent>
-            <TabsContent value="fluxo" className="mt-0">
-              <FluxoCaixaTab idEmissao={emissao.id} />
             </TabsContent>
             <TabsContent value="eventos" className="mt-0">
               <EventosTab idEmissao={emissao.id} />

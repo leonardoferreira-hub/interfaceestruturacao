@@ -1,92 +1,42 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Navigation } from '@/components/layout/Navigation';
-import { EmissaoFilters } from '@/components/emissoes/EmissaoFilters';
-import { EmissaoTable } from '@/components/emissoes/EmissaoTable';
-import { EmissaoStats } from '@/components/emissoes/EmissaoStats';
-import { EmissaoDetailDrawer } from '@/components/emissoes/EmissaoDetailDrawer';
-import { SpreadsheetMode } from '@/components/emissoes/SpreadsheetMode';
-import { BatchEditPreviewDialog } from '@/components/emissoes/BatchEditPreviewDialog';
-import { useEmissoes } from '@/hooks/useEmissoes';
-import { Emissao, FilterState } from '@/types';
-import { exportEmissoesToCSV } from '@/utils/exportUtils';
-import { Table2, LayoutGrid, Download, Plus, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { EmissaoEstruturacaoDrawer } from '@/components/estruturacao/EmissaoEstruturacaoDrawer';
+import { useEmissoesEstruturacao } from '@/hooks/useEmissoes';
+import { formatCurrency } from '@/utils/formatters';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Search, Loader2, Building2, TrendingUp, Calendar, FileText } from 'lucide-react';
 import type { EmissaoDB } from '@/types/database';
 
-// Helper to convert DB record to Emissao type for compatibility
-const mapDBToEmissao = (db: EmissaoDB): Emissao => ({
-  id: db.id,
-  codigo: db.numero_emissao || '',
-  nome: db.nome_operacao || '',
-  tipo: 'CRI', // Default - actual type comes from categoria lookup
-  status: (db.status as Emissao['status']) || 'em_estruturacao',
-  data_emissao: undefined,
-  data_vencimento: undefined,
-  created_at: db.criado_em,
-  updated_at: db.atualizado_em,
-  valor_total: db.volume || 0,
-  originador: db.empresa_razao_social || db.empresa_nome_fantasia || '',
-  cedente: db.empresa_razao_social || db.empresa_nome_fantasia || '',
-  series: [],
-  oferta_publica: false,
-  esforcos_restritos: false,
-  pendencias_count: 0,
-});
-
 const Index = () => {
-  const { data: emissoes, isLoading, error } = useEmissoes();
-  const [filters, setFilters] = useState<FilterState>({ search: '' });
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedEmissao, setSelectedEmissao] = useState<Emissao | null>(null);
+  const { data: emissoes, isLoading, error } = useEmissoesEstruturacao();
+  const [search, setSearch] = useState('');
+  const [selectedEmissao, setSelectedEmissao] = useState<EmissaoDB | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [spreadsheetMode, setSpreadsheetMode] = useState(false);
-  const [batchChanges, setBatchChanges] = useState<Partial<Emissao>[]>([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  const mappedEmissoes = useMemo(() => 
-    (emissoes || []).map(mapDBToEmissao),
-    [emissoes]
-  );
-
-  const originadores = useMemo(() => 
-    [...new Set(mappedEmissoes.map(e => e.originador).filter(Boolean))].sort(),
-    [mappedEmissoes]
-  );
 
   const filteredEmissoes = useMemo(() => {
-    return mappedEmissoes.filter(emissao => {
-      if (filters.search) {
-        const search = filters.search.toLowerCase();
-        if (!emissao.codigo?.toLowerCase().includes(search) &&
-            !emissao.nome?.toLowerCase().includes(search) &&
-            !emissao.originador?.toLowerCase().includes(search)) {
-          return false;
-        }
-      }
-      if (filters.tipo?.length && !filters.tipo.includes(emissao.tipo)) return false;
-      if (filters.status?.length && !filters.status.includes(emissao.status)) return false;
-      if (filters.originador?.length && !filters.originador.includes(emissao.originador)) return false;
-      return true;
-    });
-  }, [filters, mappedEmissoes]);
+    if (!emissoes) return [];
+    if (!search) return emissoes;
+    
+    const searchLower = search.toLowerCase();
+    return emissoes.filter(e => 
+      e.numero_emissao?.toLowerCase().includes(searchLower) ||
+      e.nome_operacao?.toLowerCase().includes(searchLower) ||
+      e.empresa_razao_social?.toLowerCase().includes(searchLower)
+    );
+  }, [emissoes, search]);
 
-  const handleRowClick = (emissao: Emissao) => {
+  const handleRowClick = (emissao: EmissaoDB) => {
     setSelectedEmissao(emissao);
     setDrawerOpen(true);
   };
 
-  const handleSpreadsheetSave = (changes: Partial<Emissao>[]) => {
-    setBatchChanges(changes);
-    setPreviewOpen(true);
-  };
-
-  const handleConfirmBatch = () => {
-    toast.success(`${batchChanges.length} registro(s) atualizado(s)`);
-    setPreviewOpen(false);
-    setSpreadsheetMode(false);
-    setBatchChanges([]);
-  };
+  // Stats
+  const totalEmissoes = filteredEmissoes.length;
+  const totalVolume = filteredEmissoes.reduce((acc, e) => acc + (e.volume || 0), 0);
+  const empresasUnicas = new Set(filteredEmissoes.map(e => e.empresa_razao_social).filter(Boolean)).size;
 
   if (isLoading) {
     return (
@@ -117,67 +67,109 @@ const Index = () => {
       <Navigation />
       
       <main className="container py-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Emissões</h1>
-            <p className="text-muted-foreground">Gerencie suas emissões de títulos</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => exportEmissoesToCSV(filteredEmissoes)}>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setSpreadsheetMode(!spreadsheetMode)}>
-              {spreadsheetMode ? <LayoutGrid className="h-4 w-4 mr-2" /> : <Table2 className="h-4 w-4 mr-2" />}
-              {spreadsheetMode ? 'Modo Tabela' : 'Modo Planilha'}
-            </Button>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Emissão
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Emissões em Estruturação</h1>
+          <p className="text-muted-foreground">Gerencie as operações em estruturação</p>
         </div>
 
-        <EmissaoStats emissoes={filteredEmissoes} />
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Emissões</span>
+              </div>
+              <div className="text-2xl font-bold">{totalEmissoes}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Volume Total</span>
+              </div>
+              <div className="text-2xl font-bold">{formatCurrency(totalVolume)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Empresas</span>
+              </div>
+              <div className="text-2xl font-bold">{empresasUnicas}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-        {!spreadsheetMode && (
-          <EmissaoFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            originadores={originadores}
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código, nome ou empresa..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
           />
-        )}
+        </div>
 
-        {spreadsheetMode ? (
-          <SpreadsheetMode
-            emissoes={filteredEmissoes}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            onSave={handleSpreadsheetSave}
-            onCancel={() => setSpreadsheetMode(false)}
-          />
-        ) : (
-          <EmissaoTable
-            emissoes={filteredEmissoes}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            onRowClick={handleRowClick}
-          />
-        )}
+        {/* Lista de Emissões */}
+        <div className="space-y-2">
+          {filteredEmissoes.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Nenhuma emissão em estruturação encontrada.
+              </CardContent>
+            </Card>
+          ) : (
+            filteredEmissoes.map((emissao) => (
+              <Card 
+                key={emissao.id} 
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => handleRowClick(emissao)}
+              >
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">
+                          {emissao.nome_operacao || emissao.numero_emissao}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {emissao.numero_emissao}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          {emissao.empresa_razao_social || 'Empresa não informada'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {emissao.criado_em 
+                            ? new Date(emissao.criado_em).toLocaleDateString('pt-BR')
+                            : '-'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">{formatCurrency(emissao.volume || 0)}</div>
+                      <Badge variant="secondary" className="text-xs">Em Estruturação</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
       </main>
 
-      <EmissaoDetailDrawer
+      <EmissaoEstruturacaoDrawer
         emissao={selectedEmissao}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-      />
-
-      <BatchEditPreviewDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        changes={batchChanges}
-        emissoes={mappedEmissoes}
-        onConfirm={handleConfirmBatch}
       />
     </div>
   );
