@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const navItems = [
   { path: '/', label: 'Emissões', icon: FileText },
+  { path: '/estruturacao', label: 'Estruturação', icon: FileText },
   { path: '/pendencias', label: 'Pendências', icon: AlertTriangle },
   { path: '/historico', label: 'Histórico', icon: History },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
