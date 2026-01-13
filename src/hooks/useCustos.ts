@@ -46,11 +46,35 @@ export function useUpdateCustos() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ idEmissao, dados }: { idEmissao: string; dados: Record<string, unknown> }) => {
+    mutationFn: async ({ idEmissao, dados }: { idEmissao: string; dados: Record<string, number | null> }) => {
       const { data, error } = await supabase
         .from('custos')
         .update(dados)
         .eq('id_emissao', idEmissao)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['custos', variables.idEmissao] });
+    },
+    onError: (error) => {
+      console.error('Erro ao atualizar custos:', error);
+    },
+  });
+}
+
+// Criar registro de custos para uma emissão
+export function useCreateCustos() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ idEmissao }: { idEmissao: string }) => {
+      const { data, error } = await supabase
+        .from('custos')
+        .insert({ id_emissao: idEmissao })
         .select()
         .single();
       
