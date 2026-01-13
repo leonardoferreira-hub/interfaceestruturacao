@@ -11,6 +11,8 @@ interface CostSectionProps {
   type: CostType;
   items: CostItem[];
   onChange: (items: CostItem[]) => void;
+  onItemSave?: (item: CostItem) => void;
+  onItemDelete?: (id: string) => void;
 }
 
 const sectionConfig = {
@@ -34,7 +36,7 @@ const sectionConfig = {
   },
 };
 
-export function CostSection({ type, items, onChange }: CostSectionProps) {
+export function CostSection({ type, items, onChange, onItemSave, onItemDelete }: CostSectionProps) {
   const config = sectionConfig[type];
   const Icon = config.icon;
 
@@ -45,21 +47,34 @@ export function CostSection({ type, items, onChange }: CostSectionProps) {
   };
 
   const handleRemove = (index: number) => {
+    const item = items[index];
     onChange(items.filter((_, i) => i !== index));
+    if (onItemDelete && item.id && !item.id.startsWith('temp-')) {
+      onItemDelete(item.id);
+    }
   };
 
   const handleAdd = () => {
     onChange([
       ...items,
       {
-        id: crypto.randomUUID(),
+        id: `temp-${crypto.randomUUID()}`,
         prestador: '',
+        papel: '',
         valor: 0,
         grossUp: 0,
         valorBruto: 0,
         tipo: 'input',
+        periodicidade: type === 'upfront' ? null : type,
       },
     ]);
+  };
+
+  const handleItemSave = (index: number, item: CostItem) => {
+    handleItemChange(index, item);
+    if (onItemSave) {
+      onItemSave(item);
+    }
   };
 
   const total = items.reduce((sum, item) => sum + item.valorBruto, 0);
@@ -108,6 +123,7 @@ export function CostSection({ type, items, onChange }: CostSectionProps) {
                     item={item}
                     onChange={(updated) => handleItemChange(index, updated)}
                     onRemove={() => handleRemove(index)}
+                    onSave={(updated) => handleItemSave(index, updated)}
                   />
                 ))
               )}

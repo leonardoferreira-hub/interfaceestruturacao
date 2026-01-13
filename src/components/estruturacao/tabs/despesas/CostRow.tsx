@@ -25,10 +25,11 @@ interface CostRowProps {
   item: CostItem;
   onChange: (item: CostItem) => void;
   onRemove: () => void;
+  onSave?: (item: CostItem) => void;
 }
 
-export function CostRow({ item, onChange, onRemove }: CostRowProps) {
-  const [isEditing, setIsEditing] = useState(!item.prestador);
+export function CostRow({ item, onChange, onRemove, onSave }: CostRowProps) {
+  const [isEditing, setIsEditing] = useState(!item.prestador || item.id?.startsWith('temp-'));
   const [editData, setEditData] = useState(item);
 
   const calculateValorBruto = (valor: number, grossUp: number) => {
@@ -40,14 +41,18 @@ export function CostRow({ item, onChange, onRemove }: CostRowProps) {
 
   const handleSave = () => {
     const valorBruto = calculateValorBruto(editData.valor, editData.grossUp);
-    onChange({ ...editData, valorBruto });
+    const updatedItem = { ...editData, valorBruto };
+    onChange(updatedItem);
     setIsEditing(false);
+    if (onSave) {
+      onSave(updatedItem);
+    }
   };
 
   const handleCancel = () => {
     setEditData(item);
     setIsEditing(false);
-    if (!item.prestador) {
+    if (!item.prestador || item.id?.startsWith('temp-')) {
       onRemove();
     }
   };

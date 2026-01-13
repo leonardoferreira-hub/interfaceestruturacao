@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, AlertCircle, Save, Loader2 } from 'lucide-react';
 import { CostSection, type CostType } from './despesas/CostSection';
 import type { CostItem } from './despesas/CostRow';
-import { useCustosEmissao, useCustosLinhas, useUpdateCustos } from '@/hooks/useCustos';
+import { useCustosEmissao, useCustosLinhas } from '@/hooks/useCustos';
 import { useSeries } from '@/hooks/useEmissoes';
 import { formatCurrency } from '@/utils/formatters';
 import { Skeleton } from '@/components/ui/skeleton';
+import { convertToApiFormat, salvarCustos } from '@/lib/supabase-custos';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface DespesasTabProps {
   idEmissao: string;
@@ -19,16 +23,18 @@ export interface CostsData {
 }
 
 export function DespesasTab({ idEmissao }: DespesasTabProps) {
+  const queryClient = useQueryClient();
   const { data: custos, isLoading: isLoadingCustos } = useCustosEmissao(idEmissao);
   const { data: custosLinhas, isLoading: isLoadingLinhas } = useCustosLinhas(custos?.id);
   const { data: series = [] } = useSeries(idEmissao);
-  const updateCustos = useUpdateCustos();
 
   const [costsData, setCostsData] = useState<CostsData>({
     upfront: [],
     anual: [],
     mensal: [],
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Volume total das séries
   const volume = series.reduce((acc, s) => acc + (s.valor_emissao || 0), 0);
@@ -41,35 +47,55 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
       const mensal: CostItem[] = [];
 
       custosLinhas.forEach((linha) => {
-        const item: CostItem = {
-          id: linha.id,
-          prestador: (linha.prestador as { nome?: string })?.nome || linha.papel || '',
-          papel: linha.papel,
-          valor: linha.preco_upfront || linha.preco_recorrente || 0,
-          grossUp: linha.gross_up || 0,
-          valorBruto: linha.valor_upfront_bruto || linha.valor_recorrente_bruto || 0,
-          tipo: 'auto',
-          id_prestador: linha.id_prestador,
-          periodicidade: linha.periodicidade,
-        };
+        const prestadorNome = (linha.prestador as { nome?: string })?.nome || linha.papel || '';
 
-        // Classificar por periodicidade
+        // Classificar APENAS por periodicidade
         if (linha.periodicidade === 'mensal') {
-          mensal.push(item);
+          // MENSAL: usar preco_recorrente
+          mensal.push({
+            id: linha.id,
+            prestador: prestadorNome,
+            papel: linha.papel,
+            valor: linha.preco_recorrente || 0,
+            grossUp: linha.gross_up || 0,
+            valorBruto: linha.valor_recorrente_bruto || linha.preco_recorrente || 0,
+            tipo: 'auto',
+            id_prestador: linha.id_prestador,
+            periodicidade: 'mensal',
+          });
         } else if (linha.periodicidade === 'anual') {
-          anual.push(item);
+          // ANUAL: usar preco_recorrente
+          anual.push({
+            id: linha.id,
+            prestador: prestadorNome,
+            papel: linha.papel,
+            valor: linha.preco_recorrente || 0,
+            grossUp: linha.gross_up || 0,
+            valorBruto: linha.valor_recorrente_bruto || linha.preco_recorrente || 0,
+            tipo: 'auto',
+            id_prestador: linha.id_prestador,
+            periodicidade: 'anual',
+          });
         } else {
-          // upfront ou sem periodicidade
+          // UPFRONT: periodicidade null/undefined, usar preco_upfront
           if (linha.preco_upfront && linha.preco_upfront > 0) {
-            upfront.push({ ...item, valor: linha.preco_upfront, valorBruto: linha.valor_upfront_bruto || linha.preco_upfront });
-          }
-          if (linha.preco_recorrente && linha.preco_recorrente > 0) {
-            anual.push({ ...item, valor: linha.preco_recorrente, valorBruto: linha.valor_recorrente_bruto || linha.preco_recorrente });
+            upfront.push({
+              id: linha.id,
+              prestador: prestadorNome,
+              papel: linha.papel,
+              valor: linha.preco_upfront,
+              grossUp: linha.gross_up || 0,
+              valorBruto: linha.valor_upfront_bruto || linha.preco_upfront,
+              tipo: 'auto',
+              id_prestador: linha.id_prestador,
+              periodicidade: null,
+            });
           }
         }
       });
 
       setCostsData({ upfront, anual, mensal });
+      setHasChanges(false);
     } else if (custos) {
       // Fallback: usar campos diretos da tabela custos se não houver linhas
       const upfront: CostItem[] = [];
@@ -134,12 +160,55 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
       });
 
       setCostsData({ upfront, anual, mensal: [] });
+      setHasChanges(false);
     }
   }, [custosLinhas, custos]);
 
   const handleSectionChange = (type: CostType, items: CostItem[]) => {
     setCostsData((prev) => ({ ...prev, [type]: items }));
-    // TODO: Salvar alterações no banco de dados
+    setHasChanges(true);
+  };
+
+  const handleSaveAll = async () => {
+    setIsSaving(true);
+    
+    try {
+      const allCosts = [
+        ...convertToApiFormat(costsData.upfront, 'upfront'),
+        ...convertToApiFormat(costsData.anual, 'anual'),
+        ...convertToApiFormat(costsData.mensal, 'mensal'),
+      ];
+
+      const totalUpfrontCalc = costsData.upfront.reduce((s, i) => s + i.valorBruto, 0);
+      const totalAnualCalc = costsData.anual.reduce((s, i) => s + i.valorBruto, 0);
+      const totalMensalCalc = costsData.mensal.reduce((s, i) => s + i.valorBruto, 0);
+
+      const result = await salvarCustos({
+        id_emissao: idEmissao,
+        custos: allCosts,
+        totais: {
+          total_upfront: totalUpfrontCalc,
+          total_anual: totalAnualCalc,
+          total_mensal: totalMensalCalc,
+          total_primeiro_ano: totalUpfrontCalc + totalAnualCalc + (totalMensalCalc * 12),
+          total_anos_subsequentes: totalAnualCalc + (totalMensalCalc * 12),
+        },
+      });
+
+      if (result.success) {
+        toast.success(`Custos salvos com sucesso${result.versao ? ` (v${result.versao})` : ''}`);
+        setHasChanges(false);
+        queryClient.invalidateQueries({ queryKey: ['custos-linhas', custos?.id] });
+        queryClient.invalidateQueries({ queryKey: ['custos', idEmissao] });
+      } else {
+        toast.error(result.error || 'Erro ao salvar custos');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar custos:', error);
+      toast.error('Erro inesperado ao salvar custos');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoadingCustos || isLoadingLinhas) {
@@ -227,6 +296,30 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Botão de Salvar */}
+      {hasChanges && (
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSaveAll}
+            disabled={isSaving}
+            size="lg"
+            className="gap-2"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Salvar Alterações
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
