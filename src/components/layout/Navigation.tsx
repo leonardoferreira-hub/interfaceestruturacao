@@ -1,15 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  FileText, 
-  Clock, 
-  History, 
+import {
+  FileText,
+  Clock,
+  History,
   BarChart3,
   Menu,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ThemeToggle } from './theme-toggle';
 
 const navItems = [
   { path: '/', label: 'Emissões', icon: FileText },
@@ -35,7 +36,7 @@ export function Navigation() {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium flex-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -55,6 +56,11 @@ export function Navigation() {
           })}
         </nav>
 
+        {/* Theme Toggle */}
+        <div className="hidden md:flex items-center">
+          <ThemeToggle />
+        </div>
+
         {/* Mobile Navigation */}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild className="md:hidden ml-auto">
@@ -64,7 +70,11 @@ export function Navigation() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[240px] sm:w-[300px]">
-            <nav className="flex flex-col gap-4 mt-8">
+            <div className="flex items-center justify-between mt-4 mb-8">
+              <span className="font-semibold">Menu</span>
+              <ThemeToggle />
+            </div>
+            <nav className="flex flex-col gap-4">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -75,8 +85,8 @@ export function Navigation() {
                     onClick={() => setOpen(false)}
                     className={cn(
                       'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
-                      isActive 
-                        ? 'bg-primary text-primary-foreground' 
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
                         : 'hover:bg-muted'
                     )}
                   >
