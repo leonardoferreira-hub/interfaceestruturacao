@@ -1,13 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
+    /* Tipografia Brutalista */
+    --font-display: 'DM Serif Display', serif;
+    --font-body: system-ui, -apple-system, sans-serif;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 

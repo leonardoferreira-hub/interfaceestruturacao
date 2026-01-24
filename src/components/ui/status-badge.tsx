@@ -4,64 +4,76 @@ import { cn } from '@/lib/utils';
 interface StatusConfig {
   bg: string;
   text: string;
+  border: string;
   label: string;
 }
 
 const statusConfig: Record<string, StatusConfig> = {
   'ok': {
-    bg: 'bg-green-100 dark:bg-green-900',
-    text: 'text-green-800 dark:text-green-300',
+    bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-300 dark:border-emerald-700',
     label: 'OK'
   },
   'pendente': {
-    bg: 'bg-yellow-100 dark:bg-yellow-900',
-    text: 'text-yellow-800 dark:text-yellow-300',
-    label: 'Pendente'
+    bg: 'bg-amber-100 dark:bg-amber-900/50',
+    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-300 dark:border-amber-700',
+    label: 'PENDENTE'
   },
   'nok': {
-    bg: 'bg-red-100 dark:bg-red-900',
-    text: 'text-red-800 dark:text-red-300',
+    bg: 'bg-rose-100 dark:bg-rose-900/50',
+    text: 'text-rose-700 dark:text-rose-300',
+    border: 'border-rose-300 dark:border-rose-700',
     label: 'NOK'
   },
   'em_analise': {
-    bg: 'bg-blue-100 dark:bg-blue-900',
-    text: 'text-blue-800 dark:text-blue-300',
-    label: 'Em Análise'
+    bg: 'bg-sky-100 dark:bg-sky-900/50',
+    text: 'text-sky-700 dark:text-sky-300',
+    border: 'border-sky-300 dark:border-sky-700',
+    label: 'EM ANÁLISE'
   },
   'aprovado': {
-    bg: 'bg-green-100 dark:bg-green-900',
-    text: 'text-green-800 dark:text-green-300',
-    label: 'Aprovado'
+    bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-300 dark:border-emerald-700',
+    label: 'APROVADO'
   },
   'reprovado': {
-    bg: 'bg-red-100 dark:bg-red-900',
-    text: 'text-red-800 dark:text-red-300',
-    label: 'Reprovado'
+    bg: 'bg-rose-100 dark:bg-rose-900/50',
+    text: 'text-rose-700 dark:text-rose-300',
+    border: 'border-rose-300 dark:border-rose-700',
+    label: 'REPROVADO'
   },
   'Em Estruturação': {
-    bg: 'bg-blue-100 dark:bg-blue-900',
-    text: 'text-blue-800 dark:text-blue-300',
-    label: 'Em Estruturação'
+    bg: 'bg-sky-100 dark:bg-sky-900/50',
+    text: 'text-sky-700 dark:text-sky-300',
+    border: 'border-sky-300 dark:border-sky-700',
+    label: 'EM ESTRUTURAÇÃO'
   },
   'Liquidada': {
-    bg: 'bg-green-100 dark:bg-green-900',
-    text: 'text-green-800 dark:text-green-300',
-    label: 'Liquidada'
+    bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-300 dark:border-emerald-700',
+    label: 'LIQUIDADA'
   },
   'On Hold': {
-    bg: 'bg-yellow-100 dark:bg-yellow-900',
-    text: 'text-yellow-800 dark:text-yellow-300',
-    label: 'On Hold'
+    bg: 'bg-amber-100 dark:bg-amber-900/50',
+    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-300 dark:border-amber-700',
+    label: 'ON HOLD'
   },
   'Abortada': {
-    bg: 'bg-red-100 dark:bg-red-900',
-    text: 'text-red-800 dark:text-red-300',
-    label: 'Abortada'
+    bg: 'bg-rose-100 dark:bg-rose-900/50',
+    text: 'text-rose-700 dark:text-rose-300',
+    border: 'border-rose-300 dark:border-rose-700',
+    label: 'ABORTADA'
   },
   'Finalizada': {
-    bg: 'bg-slate-100 dark:bg-slate-900',
-    text: 'text-slate-800 dark:text-slate-300',
-    label: 'Finalizada'
+    bg: 'bg-slate-100 dark:bg-slate-900/50',
+    text: 'text-slate-700 dark:text-slate-300',
+    border: 'border-slate-300 dark:border-slate-700',
+    label: 'FINALIZADA'
   }
 };
 
@@ -75,12 +87,14 @@ export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
 
   return (
     <motion.span
-      initial={{ scale: 0.9, opacity: 0 }}
+      initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.2 }}
-      whileHover={{ scale: 1.05 }}
+      transition={{ duration: 0.15 }}
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+        'inline-flex items-center px-2.5 py-0.5',
+        'text-xs font-medium uppercase tracking-wider',
+        'border rounded-none', // Cantos retos para estética brutalista
+        config.border,
         config.bg,
         config.text,
         className

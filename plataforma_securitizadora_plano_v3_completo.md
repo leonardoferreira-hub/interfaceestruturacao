@@ -2,7 +2,7 @@
 
 **Autor**: Manus AI  
 **Data**: 24 de Janeiro de 2026  
-**Versão**: 2.0
+**Versão**: 3.0 (Atualizada com Correções de UI e Prompt para Skill)
 
 ---
 
@@ -10,16 +10,18 @@
 
 1. [Introdução e Contexto](#1-introdução-e-contexto)
 2. [Análise do Sistema Atual e Proposta de Evolução](#2-análise-do-sistema-atual-e-proposta-de-evolução)
-3. [Diretrizes de Design e Experiência do Usuário](#3-diretrizes-de-design-e-experiência-do-usuário-uxui)
-4. [Arquitetura da Base de Dados](#4-arquitetura-da-base-de-dados)
-5. [Scripts SQL para Criação das Tabelas](#5-scripts-sql-para-criação-das-tabelas)
-6. [Migração de Dados](#6-migração-de-dados)
-7. [Sistema de Autenticação e Perfis](#7-sistema-de-autenticação-e-perfis)
-8. [Automação de E-mails](#8-automação-de-e-mails)
-9. [Estrutura do Frontend](#9-estrutura-do-frontend)
-10. [Cronograma de Implementação](#10-cronograma-de-implementação)
-11. [Próximos Passos](#11-próximos-passos)
-12. [Referências](#12-referências)
+3. [Correção Urgente: Dark Mode e ThemeProvider](#3-correção-urgente-dark-mode-e-themeprovider)
+4. [Prompt para Evolução da UI (Skill: frontend-design)](#4-prompt-para-evolução-da-ui-skill-frontend-design)
+5. [Diretrizes de Design e Experiência do Usuário](#5-diretrizes-de-design-e-experiência-do-usuário-uxui)
+6. [Arquitetura da Base de Dados](#6-arquitetura-da-base-de-dados)
+7. [Scripts SQL para Criação das Tabelas](#7-scripts-sql-para-criação-das-tabelas)
+8. [Migração de Dados](#8-migração-de-dados)
+9. [Sistema de Autenticação e Perfis](#9-sistema-de-autenticação-e-perfis)
+10. [Automação de E-mails](#10-automação-de-e-mails)
+11. [Estrutura do Frontend](#11-estrutura-do-frontend)
+12. [Cronograma de Implementação](#12-cronograma-de-implementação)
+13. [Próximos Passos](#13-próximos-passos)
+14. [Referências](#14-referências)
 
 ---
 
@@ -115,16 +117,441 @@ A tabela abaixo resume os elementos que serão preservados da implementação at
 | **Página de Administração** | Interface para admins gerenciarem usuários e configurações |
 | **Workflow Visual de Compliance** | Componente interativo para verificação de documentos |
 | **Audit Log** | Tabela e interface para visualizar histórico de mudanças |
-| **Dark Mode** | Tema escuro em toda a aplicação |
+| **Dark Mode Funcional** | Tema escuro em toda a aplicação com toggle correto |
 | **Animações e Micro-interações** | Feedback visual e transições fluidas |
 
 ---
 
-## 3. Diretrizes de Design e Experiência do Usuário (UX/UI)
+## 3. Correção Urgente: Dark Mode e ThemeProvider
+
+Após a implementação inicial, a interface apresentou um problema crítico: o **"dark mode eterno"**. A interface ficou travada em modo escuro, sem possibilidade de alternar para o modo claro. Esta seção detalha a causa raiz e o passo a passo para correção.
+
+### 3.1. Diagnóstico do Problema
+
+O problema se deve à implementação incorreta do gerenciamento de tema. O hook `use-theme.ts` customizado foi criado, mas não foi integrado corretamente no nível raiz da aplicação através de um `Context Provider`. Além disso, o valor padrão do tema estava configurado como `"system"`, o que fazia a aplicação herdar o tema do sistema operacional do usuário.
+
+**Arquivos Problemáticos:**
+- `src/hooks/use-theme.ts` - Hook customizado sem Context Provider
+- `src/main.tsx` - Não envolve a aplicação com o ThemeProvider
+
+### 3.2. Passo a Passo para Correção
+
+**Passo 1: Criar o `ThemeProvider` Correto**
+
+Crie um novo arquivo em `src/components/theme-provider.tsx`. Este componente será o único responsável por gerenciar o estado do tema em toda a aplicação.
+
+```tsx
+// src/components/theme-provider.tsx
+import { createContext, useContext, useEffect, useState } from "react"
+
+type Theme = "dark" | "light" | "system"
+
+type ThemeProviderProps = {
+  children: React.ReactNode
+  defaultTheme?: Theme
+  storageKey?: string
+}
+
+type ThemeProviderState = {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+}
+
+const initialState: ThemeProviderState = {
+  theme: "system",
+  setTheme: () => null,
+}
+
+const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
+
+export function ThemeProvider({
+  children,
+  defaultTheme = "light", // IMPORTANTE: Padrão é "light", não "system"
+  storageKey = "vite-ui-theme",
+  ...props
+}: ThemeProviderProps) {
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+  )
+
+  useEffect(() => {
+    const root = window.document.documentElement
+
+    root.classList.remove("light", "dark")
+
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
+        ? "dark"
+        : "light"
+
+      root.classList.add(systemTheme)
+      return
+    }
+
+    root.classList.add(theme)
+  }, [theme])
+
+  const value = {
+    theme,
+    setTheme: (theme: Theme) => {
+      localStorage.setItem(storageKey, theme)
+      setTheme(theme)
+    },
+  }
+
+  return (
+    <ThemeProviderContext.Provider {...props} value={value}>
+      {children}
+    </ThemeProviderContext.Provider>
+  )
+}
+
+export const useTheme = () => {
+  const context = useContext(ThemeProviderContext)
+
+  if (context === undefined)
+    throw new Error("useTheme must be used within a ThemeProvider")
+
+  return context
+}
+```
+
+**Passo 2: Remover o Hook Antigo**
+
+Delete o arquivo `src/hooks/use-theme.ts`. O novo `useTheme` está agora dentro do `theme-provider.tsx`.
+
+**Passo 3: Envolver a Aplicação com o Provider**
+
+Modifique o arquivo `src/main.tsx` para envolver o componente `<App />` com o `<ThemeProvider />`.
+
+```tsx
+// src/main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+import { ThemeProvider } from "./components/theme-provider"
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+      <App />
+    </ThemeProvider>
+  </React.StrictMode>,
+)
+```
+
+**Passo 4: Atualizar o `theme-toggle.tsx`**
+
+Atualize o componente de toggle para usar o hook do novo provider. A importação deve mudar de `@/hooks/use-theme` para `@/components/theme-provider`.
+
+```tsx
+// src/components/layout/theme-toggle.tsx
+import { Moon, Sun } from "lucide-react"
+import { motion } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { useTheme } from "@/components/theme-provider" // IMPORTAÇÃO ATUALIZADA
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+
+  // Determina o tema efetivo (para quando theme === "system")
+  const effectiveTheme = theme === "system" 
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(effectiveTheme === "light" ? "dark" : "light")}
+      className="relative"
+      aria-label="Alternar tema"
+    >
+      <motion.div
+        initial={false}
+        animate={{
+          scale: effectiveTheme === "light" ? 1 : 0,
+          opacity: effectiveTheme === "light" ? 1 : 0,
+          rotate: effectiveTheme === "light" ? 0 : 180,
+        }}
+        transition={{ duration: 0.2 }}
+        className="absolute"
+      >
+        <Sun className="h-5 w-5" />
+      </motion.div>
+      <motion.div
+        initial={false}
+        animate={{
+          scale: effectiveTheme === "dark" ? 1 : 0,
+          opacity: effectiveTheme === "dark" ? 1 : 0,
+          rotate: effectiveTheme === "dark" ? 0 : -180,
+        }}
+        transition={{ duration: 0.2 }}
+        className="absolute"
+      >
+        <Moon className="h-5 w-5" />
+      </motion.div>
+      <span className="sr-only">Alternar tema</span>
+    </Button>
+  )
+}
+```
+
+**Passo 5: Verificar `tailwind.config.ts`**
+
+Garanta que a configuração do dark mode está correta no arquivo `tailwind.config.ts`.
+
+```ts
+// tailwind.config.ts
+import type { Config } from "tailwindcss"
+
+const config = {
+  darkMode: ["class"], // Esta linha é CRUCIAL
+  content: [
+    './pages/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx}',
+    './src/**/*.{ts,tsx}',
+  ],
+  // ... restante da configuração
+} satisfies Config
+
+export default config
+```
+
+**Passo 6: Verificar `index.css`**
+
+O arquivo `index.css` já contém as variáveis CSS para ambos os temas (`:root` para light e `.dark` para dark). Verifique se as variáveis estão definidas corretamente. Se necessário, ajuste as cores conforme a paleta definida na Seção 5.
+
+### 3.3. Teste de Verificação
+
+Após aplicar as correções:
+
+1. Limpe o `localStorage` do navegador (ou abra em aba anônima)
+2. Recarregue a aplicação
+3. A aplicação deve iniciar em **Light Mode** (fundo claro)
+4. Clique no botão de toggle de tema no header
+5. A aplicação deve alternar para **Dark Mode** (fundo escuro)
+6. Recarregue a página - o tema escolhido deve persistir
+
+---
+
+## 4. Prompt para Evolução da UI (Skill: frontend-design)
+
+Para transformar a interface de um sistema funcional para uma experiência memorável e esteticamente agradável, utilize o prompt a seguir. Ele foi desenhado para ser usado por um assistente de IA (como o Claude) que tenha acesso à skill `frontend-design`.
+
+### 4.1. Contexto da Skill
+
+A skill `frontend-design` guia a criação de interfaces frontend distintivas e de qualidade de produção, evitando a estética genérica de "AI slop". Ela enfatiza:
+
+- **Tipografia**: Fontes únicas e interessantes, evitando genéricas como Arial e Inter
+- **Cores e Tema**: Paleta coesa com cores dominantes e acentos marcantes
+- **Animações**: Micro-interações e efeitos de scroll que surpreendem
+- **Composição Espacial**: Layouts inesperados, assimetria, sobreposição
+- **Detalhes Visuais**: Texturas, gradientes, sombras dramáticas, bordas decorativas
+
+### 4.2. Prompt Completo para Refatoração da UI
+
+Copie e cole o prompt abaixo em uma conversa com o Claude (ou outro assistente com acesso à skill):
+
+---
+
+> **PROMPT PARA O ASSISTENTE DE IA:**
+> 
+> Assistente, utilize a skill `frontend-design` para refatorar a interface da nossa plataforma de gestão de securitização. O objetivo é criar uma identidade visual única e sofisticada, abandonando a estética padrão do `shadcn/ui`.
+> 
+> ---
+> 
+> ## Contexto do Projeto
+> 
+> Esta é uma plataforma de gestão de operações de securitização para uma empresa financeira. Os usuários são analistas e gestores que precisam visualizar, filtrar e editar operações em um pipeline. A plataforma deve transmitir **confiança**, **seriedade** e **eficiência**.
+> 
+> **Stack Tecnológica:**
+> - React 18 + TypeScript
+> - Vite
+> - TailwindCSS
+> - shadcn/ui (base de componentes)
+> - Framer Motion (animações)
+> - Supabase (backend)
+> 
+> ---
+> 
+> ## Direção Estética
+> 
+> Adote um tom **"Brutalista Refinado"** (Refined Brutalism). Pense na solidez e honestidade do brutalismo arquitetônico (estruturas claras, materiais crus, funcionalidade exposta), mas com a elegância e precisão de uma aplicação financeira de ponta.
+> 
+> **Características-chave:**
+> - Linhas retas e ângulos definidos
+> - Tipografia forte e hierárquica
+> - Espaçamento generoso e intencional
+> - Bordas finas em vez de sombras
+> - Cores neutras com acentos precisos
+> - Densidade de informação controlada
+> 
+> ---
+> 
+> ## Diretrizes de Implementação
+> 
+> ### 1. Tipografia
+> 
+> - **Display/Títulos**: Utilize a fonte **"DM Serif Display"** (Google Fonts) para títulos de página, métricas importantes e números grandes. Sua serifa forte transmite autoridade.
+> - **Corpo/UI**: Utilize a fonte **"Geist"** ou **"Satoshi"** (ambas disponíveis gratuitamente) para o corpo do texto e elementos de interface. São modernas, legíveis e menos genéricas que Inter.
+> 
+> **Implementação:**
+> ```css
+> @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap');
+> 
+> :root {
+>   --font-display: 'DM Serif Display', serif;
+>   --font-body: 'Geist', system-ui, sans-serif;
+> }
+> ```
+> 
+> ### 2. Paleta de Cores
+> 
+> **Light Mode:**
+> | Elemento | Cor | Hex |
+> |:---|:---|:---|
+> | Background | Slate 50 | #F8FAFC |
+> | Card | White | #FFFFFF |
+> | Texto Principal | Slate 900 | #0F172A |
+> | Texto Secundário | Slate 500 | #64748B |
+> | Borda | Slate 200 | #E2E8F0 |
+> | Primária (Acento) | Blue 600 | #2563EB |
+> 
+> **Dark Mode:**
+> | Elemento | Cor | Hex |
+> |:---|:---|:---|
+> | Background | Slate 950 | #020617 |
+> | Card | Slate 900 | #0F172A |
+> | Texto Principal | Slate 50 | #F8FAFC |
+> | Texto Secundário | Slate 400 | #94A3B8 |
+> | Borda | Slate 800 | #1E293B |
+> | Primária (Acento) | Blue 400 | #60A5FA |
+> 
+> **Cores de Status:**
+> - Sucesso: `emerald-500` (#10B981)
+> - Alerta: `amber-500` (#F59E0B)
+> - Erro: `rose-500` (#F43F5E)
+> - Info: `sky-500` (#0EA5E9)
+> 
+> ### 3. Layout e Composição
+> 
+> **Página Principal (Pipeline):**
+> - Substitua os 3 cards de métricas no topo por uma **barra de status horizontal** mais densa e informativa
+> - A tabela de dados deve ser o elemento central, ocupando o máximo de espaço vertical
+> - Use bordas finas (`border-slate-200` / `dark:border-slate-800`) em vez de sombras para delimitar componentes
+> - Adicione uma **linha de destaque** (2px, cor primária) no topo do header para criar identidade visual
+> 
+> **Tabela de Dados:**
+> - Header da tabela com fundo levemente diferente (`slate-100` / `dark:slate-800`)
+> - Linhas alternadas sutis (`slate-50` / `white` em light mode)
+> - Hover com transição suave para `slate-100` / `dark:slate-800`
+> - Badges de status com cantos retos (não arredondados) para reforçar a estética brutalista
+> 
+> ### 4. Animações (Framer Motion)
+> 
+> **Carregamento da Tabela:**
+> ```tsx
+> const containerVariants = {
+>   hidden: { opacity: 0 },
+>   visible: {
+>     opacity: 1,
+>     transition: {
+>       staggerChildren: 0.03, // Delay sutil entre linhas
+>     },
+>   },
+> };
+> 
+> const rowVariants = {
+>   hidden: { opacity: 0, y: 10 },
+>   visible: { opacity: 1, y: 0 },
+> };
+> ```
+> 
+> **Hover na Tabela:**
+> ```tsx
+> <motion.tr
+>   whileHover={{ backgroundColor: "rgba(0,0,0,0.02)" }}
+>   transition={{ duration: 0.15 }}
+> >
+> ```
+> 
+> **Abertura do Sheet de Detalhes:**
+> ```tsx
+> <Sheet>
+>   <SheetContent>
+>     <motion.div
+>       initial={{ opacity: 0, x: 50 }}
+>       animate={{ opacity: 1, x: 0 }}
+>       exit={{ opacity: 0, x: 50 }}
+>       transition={{ type: "spring", damping: 25, stiffness: 300 }}
+>     >
+>       {/* Conteúdo */}
+>     </motion.div>
+>   </SheetContent>
+> </Sheet>
+> ```
+> 
+> ### 5. Componentes Específicos
+> 
+> **StatusBadge (Brutalista):**
+> ```tsx
+> const StatusBadge = ({ status }: { status: string }) => {
+>   const config = {
+>     "Em Estruturação": { bg: "bg-sky-100 dark:bg-sky-900/50", text: "text-sky-700 dark:text-sky-300", border: "border-sky-300 dark:border-sky-700" },
+>     "Liquidada": { bg: "bg-emerald-100 dark:bg-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-300 dark:border-emerald-700" },
+>     "On Hold": { bg: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-700 dark:text-amber-300", border: "border-amber-300 dark:border-amber-700" },
+>     "Abortada": { bg: "bg-rose-100 dark:bg-rose-900/50", text: "text-rose-700 dark:text-rose-300", border: "border-rose-300 dark:border-rose-700" },
+>   }[status] || { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" };
+> 
+>   return (
+>     <span className={`
+>       inline-flex items-center px-2.5 py-0.5 
+>       text-xs font-medium uppercase tracking-wider
+>       border ${config.border} ${config.bg} ${config.text}
+>       rounded-none // Cantos retos para estética brutalista
+>     `}>
+>       {status}
+>     </span>
+>   );
+> };
+> ```
+> 
+> ---
+> 
+> ## Tarefa Concreta
+> 
+> Gere o código `tsx` completo para os seguintes componentes, aplicando todas as diretrizes acima:
+> 
+> 1. **`src/components/layout/Header.tsx`** - Header com navegação, logo, e toggle de tema
+> 2. **`src/components/ui/status-bar.tsx`** - Nova barra de status horizontal para substituir os cards de métricas
+> 3. **`src/components/ui/data-table.tsx`** - Tabela avançada com animações de entrada
+> 4. **`src/components/ui/status-badge.tsx`** - Badge de status estilizado
+> 5. **`src/pages/Index.tsx`** - Página principal do Pipeline integrando todos os componentes
+> 
+> O código deve ser completo, pronto para copiar e colar, e seguir as melhores práticas de React e TypeScript.
+
+---
+
+### 4.3. Instruções de Uso
+
+1. Copie o prompt acima integralmente
+2. Abra uma nova conversa com o Claude (ou outro assistente com acesso à skill `frontend-design`)
+3. Cole o prompt e envie
+4. O assistente gerará o código dos componentes
+5. Revise o código gerado e integre na aplicação
+6. Ajuste conforme necessário para seu contexto específico
+
+---
+
+## 5. Diretrizes de Design e Experiência do Usuário (UX/UI)
 
 Para elevar a plataforma, adotaremos princípios de design moderno, focados em clareza, eficiência e uma estética agradável.
 
-### 3.1. Filosofia de Design
+### 5.1. Filosofia de Design
 
 Os 10 princípios de design para dashboards modernos que guiarão o desenvolvimento são:
 
@@ -148,7 +575,7 @@ Os 10 princípios de design para dashboards modernos que guiarão o desenvolvime
 
 10. **Design Minimalista e Estética Funcional**: "Menos é mais". Cada elemento deve servir a um propósito claro.
 
-### 3.2. Paleta de Cores
+### 5.2. Paleta de Cores
 
 Adotaremos uma paleta de cores moderna e acessível, com suporte para Light e Dark Mode:
 
@@ -159,24 +586,24 @@ Adotaremos uma paleta de cores moderna e acessível, com suporte para Light e Da
 | | Texto Principal | #0F172A | `text-slate-900` |
 | | Texto Secundário | #64748B | `text-slate-500` |
 | | Borda | #E2E8F0 | `border-slate-200` |
-| | Primária (Acento) | #3B82F6 | `bg-blue-500` |
-| **Dark** | Background | #0F172A | `dark:bg-slate-900` |
-| | Card/Widget | #1E293B | `dark:bg-slate-800` |
+| | Primária (Acento) | #2563EB | `bg-blue-600` |
+| **Dark** | Background | #020617 | `dark:bg-slate-950` |
+| | Card/Widget | #0F172A | `dark:bg-slate-900` |
 | | Texto Principal | #F8FAFC | `dark:text-slate-50` |
 | | Texto Secundário | #94A3B8 | `dark:text-slate-400` |
-| | Borda | #334155 | `dark:border-slate-700` |
+| | Borda | #1E293B | `dark:border-slate-800` |
 | | Primária (Acento) | #60A5FA | `dark:bg-blue-400` |
 
 **Cores de Status:**
 
 | Status | Light Mode | Dark Mode | Uso |
 |:---|:---|:---|:---|
-| Sucesso/OK | `bg-green-100 text-green-800` | `dark:bg-green-900 dark:text-green-300` | Compliance aprovado, pendência resolvida |
-| Alerta/Pendente | `bg-yellow-100 text-yellow-800` | `dark:bg-yellow-900 dark:text-yellow-300` | Aguardando ação, em análise |
-| Erro/NOK | `bg-red-100 text-red-800` | `dark:bg-red-900 dark:text-red-300` | Compliance reprovado, problema |
-| Info/Em Estruturação | `bg-blue-100 text-blue-800` | `dark:bg-blue-900 dark:text-blue-300` | Status neutro, em progresso |
+| Sucesso/OK | `bg-emerald-100 text-emerald-700` | `dark:bg-emerald-900/50 dark:text-emerald-300` | Compliance aprovado, pendência resolvida |
+| Alerta/Pendente | `bg-amber-100 text-amber-700` | `dark:bg-amber-900/50 dark:text-amber-300` | Aguardando ação, em análise |
+| Erro/NOK | `bg-rose-100 text-rose-700` | `dark:bg-rose-900/50 dark:text-rose-300` | Compliance reprovado, problema |
+| Info/Em Estruturação | `bg-sky-100 text-sky-700` | `dark:bg-sky-900/50 dark:text-sky-300` | Status neutro, em progresso |
 
-### 3.3. Animações e Micro-interações (Framer Motion)
+### 5.3. Animações e Micro-interações (Framer Motion)
 
 Animações serão usadas de forma sutil para melhorar a usabilidade, não para distrair.
 
@@ -187,288 +614,123 @@ Animações serão usadas de forma sutil para melhorar a usabilidade, não para 
 | **Hover em Botões/Links** | Todos os elementos clicáveis | `scale: 1.02` com `duration: 0.15s` |
 | **Abertura de Sheets** | Modal de detalhes | `slide-in` da direita com `spring` |
 | **Abertura de Modais** | Dialogs de confirmação | `fade-in` + `scale` de 0.95 para 1 |
-| **Listas e Tabelas** | Entrada de itens | `stagger` com delay de 0.05s por item |
+| **Listas e Tabelas** | Entrada de itens | `stagger` com delay de 0.03s por item |
 | **Notificações (Toasts)** | Feedback de ações | `slide-in` do canto + `slide-out` após 5s |
 | **Drag and Drop** | Kanban de pendências | `layout` animation do Framer Motion |
 
-**Exemplo de implementação com Framer Motion:**
-
-```tsx
-// Componente de lista animada
-import { motion } from 'framer-motion';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-
-export const AnimatedList = ({ items }) => (
-  <motion.ul
-    variants={containerVariants}
-    initial="hidden"
-    animate="visible"
-    className="space-y-2"
-  >
-    {items.map(item => (
-      <motion.li
-        key={item.id}
-        variants={itemVariants}
-        className="p-4 bg-white rounded-lg shadow"
-      >
-        {item.name}
-      </motion.li>
-    ))}
-  </motion.ul>
-);
-```
-
-**Exemplo de StatusBadge com animação:**
-
-```tsx
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-
-const statusConfig = {
-  'ok': { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-300', label: 'OK' },
-  'pendente': { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-300', label: 'Pendente' },
-  'nok': { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-300', label: 'NOK' },
-};
-
-export const StatusBadge = ({ status }) => {
-  const config = statusConfig[status] || statusConfig['pendente'];
-  
-  return (
-    <motion.span
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-        config.bg,
-        config.text
-      )}
-    >
-      {config.label}
-    </motion.span>
-  );
-};
-```
-
 ---
 
-## 4. Arquitetura da Base de Dados
+## 6. Arquitetura da Base de Dados
 
-A estrutura do banco de dados será organizada em schemas para manter a separação lógica das responsabilidades e facilitar a manutenção.
+### 6.1. Modelo de Dados
 
-### 4.1. Visão Geral dos Schemas
+O schema `estruturacao` conterá as seguintes tabelas principais:
 
-| Schema | Responsabilidade | Tabelas Principais |
+```
+estruturacao
+├── operacoes           # Tabela central de operações
+├── pendencias          # Campos de pendência por operação
+├── compliance_checks   # Verificações de compliance
+├── analistas_gestao    # Lista de analistas de gestão
+└── hierarquia_analistas # Mapeamento analista gestão → financeiro/contábil
+
+public
+└── historico_alteracoes # Audit log de todas as alterações
+└── user_profiles        # Perfis de usuário (admin, gestor, analista)
+```
+
+### 6.2. Tabela Principal: `estruturacao.operacoes`
+
+| Coluna | Tipo | Descrição |
 |:---|:---|:---|
-| `public` | Tabelas compartilhadas e autenticação | `usuarios`, `perfis`, `historico_alteracoes` |
-| `base_custos` | Tabelas de referência do comercial | `categorias`, `veiculos`, `tipos_oferta`, `lastros` |
-| `estruturacao` | Dados específicos da interface de estruturação | `operacoes`, `pendencias`, `compliance_checks`, `analistas_gestao` |
-
-### 4.2. Modelo de Dados Detalhado
-
-#### 4.2.1. Tabela `estruturacao.operacoes`
-
-Esta é a tabela central do sistema, consolidando todas as operações desde a aceitação da proposta comercial até a liquidação e arquivamento.
-
-| Coluna | Tipo | Obrigatório | Descrição |
-|:---|:---|:---|:---|
-| `id` | `uuid` | Sim | Chave primária |
-| `id_emissao_comercial` | `uuid` | Não | FK para `public.emissoes` (origem comercial) |
-| `numero_emissao` | `text` | Sim | Código único da emissão (ex: EM-20260115-0019) |
-| `nome_operacao` | `text` | Sim | Nome descritivo da operação |
-| `status` | `text` | Sim | Status atual: `Em Estruturação`, `Liquidada`, `On Hold`, `Abortada`, `Finalizada` |
-| `pmo_id` | `uuid` | Não | FK para `public.usuarios` - PMO responsável |
-| `analista_gestao_id` | `uuid` | Não | FK para `estruturacao.analistas_gestao` |
-| `analista_financeiro_id` | `uuid` | Não | Preenchido automaticamente via hierarquia |
-| `analista_contabil_id` | `uuid` | Não | Preenchido automaticamente via hierarquia |
-| `categoria_id` | `uuid` | Não | FK para `base_custos.categorias` (CRI, CRA, DEB, etc.) |
-| `veiculo_id` | `uuid` | Não | FK para `base_custos.veiculos` |
-| `tipo_oferta_id` | `uuid` | Não | FK para `base_custos.tipos_oferta` |
-| `lastro_id` | `uuid` | Não | FK para `base_custos.lastros` |
-| `volume` | `numeric(18,2)` | Sim | Volume total da operação |
-| `empresa_cnpj` | `text` | Não | CNPJ da empresa emissora |
-| `empresa_razao_social` | `text` | Não | Razão social da empresa |
-| `data_entrada_pipe` | `timestamptz` | Sim | Data de entrada no pipeline |
-| `data_previsao_liquidacao` | `date` | Não | Previsão de liquidação |
-| `data_liquidacao` | `date` | Não | Data efetiva de liquidação |
-| `data_primeira_pagamento` | `date` | Não | 1ª data de pagamento |
-| `fee_estruturacao` | `numeric(10,4)` | Não | Fee de estruturação (%) |
-| `fee_gestao` | `numeric(10,4)` | Não | Fee de gestão (%) |
-| `fee_originacao` | `numeric(10,4)` | Não | Fee de originação (%) |
-| `boletagem` | `text` | Não | Status da boletagem |
-| `df` | `text` | Não | Distribuição financeira |
-| `banco` | `text` | Não | Banco da operação |
-| `agencia` | `text` | Não | Agência bancária |
-| `conta_bancaria` | `text` | Não | Conta bancária |
-| `majoracao` | `numeric(10,4)` | Não | Majoração (%) |
-| `floating` | `boolean` | Não | Indicador de floating |
-| `proximos_passos` | `text` | Não | Próximos passos da operação |
-| `alertas` | `text` | Não | Alertas importantes |
-| `status_tech` | `text` | Não | Status técnico |
-| `resumo` | `text` | Não | Resumo da operação |
-| `investidores_obs` | `text` | Não | Observações sobre investidores |
-| `criado_em` | `timestamptz` | Sim | Data de criação do registro |
-| `atualizado_em` | `timestamptz` | Sim | Data da última atualização |
-
-#### 4.2.2. Tabela `estruturacao.pendencias`
-
-Gerencia as pendências de operações já liquidadas. Uma operação vai para pendências quando liquida mas ainda possui campos com status "pendente".
-
-| Coluna | Tipo | Obrigatório | Descrição |
-|:---|:---|:---|:---|
-| `id` | `uuid` | Sim | Chave primária |
-| `operacao_id` | `uuid` | Sim | FK para `estruturacao.operacoes` |
-| `mapa_liquidacao` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `mapa_registros` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `lo_status` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `due_diligence` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `envio_email_prestadores` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `passagem_bastao` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `kick_off` | `text` | Sim | Status: `ok`, `nok`, `pendente` |
-| `resolvida` | `boolean` | Sim | Indica se todas as pendências foram resolvidas |
-| `criado_em` | `timestamptz` | Sim | Data de criação |
-| `atualizado_em` | `timestamptz` | Sim | Data da última atualização |
-
-#### 4.2.3. Tabela `estruturacao.compliance_checks`
-
-Rastreia as verificações de compliance (CPF/CNPJ) para cada parte envolvida na operação.
-
-| Coluna | Tipo | Obrigatório | Descrição |
-|:---|:---|:---|:---|
-| `id` | `uuid` | Sim | Chave primária |
-| `operacao_id` | `uuid` | Sim | FK para `estruturacao.operacoes` |
-| `documento` | `text` | Sim | CPF ou CNPJ a ser verificado |
-| `tipo_documento` | `text` | Sim | `CPF` ou `CNPJ` |
-| `nome_entidade` | `text` | Não | Nome da pessoa/empresa |
-| `tipo_entidade` | `text` | Não | Tipo: `Cedente`, `Devedor`, `Avalista`, etc. |
-| `status` | `text` | Sim | `pendente`, `em_analise`, `aprovado`, `reprovado` |
-| `responsavel_id` | `uuid` | Não | FK para `public.usuarios` - quem está analisando |
-| `observacoes` | `text` | Não | Observações da análise |
-| `data_verificacao` | `timestamptz` | Não | Data da verificação |
-| `criado_em` | `timestamptz` | Sim | Data de criação |
-| `atualizado_em` | `timestamptz` | Sim | Data da última atualização |
-
-#### 4.2.4. Tabela `estruturacao.analistas_gestao`
-
-Tabela de referência para os analistas de gestão, financeiro e contábil (usada em dropdowns).
-
-| Coluna | Tipo | Obrigatório | Descrição |
-|:---|:---|:---|:---|
-| `id` | `uuid` | Sim | Chave primária |
-| `nome` | `text` | Sim | Nome do analista |
-| `email` | `text` | Não | E-mail do analista |
-| `tipo` | `text` | Sim | `gestao`, `financeiro`, `contabil` |
-| `ativo` | `boolean` | Sim | Se o analista está ativo |
-| `criado_em` | `timestamptz` | Sim | Data de criação |
-
-#### 4.2.5. Tabela `estruturacao.hierarquia_analistas`
-
-Mapeia a relação automática entre analistas de gestão, financeiro e contábil.
-
-| Coluna | Tipo | Obrigatório | Descrição |
-|:---|:---|:---|:---|
-| `analista_gestao_id` | `uuid` | Sim | PK e FK para `analistas_gestao` |
-| `analista_financeiro_id` | `uuid` | Sim | FK para `analistas_gestao` |
-| `analista_contabil_id` | `uuid` | Sim | FK para `analistas_gestao` |
-
-#### 4.2.6. Tabela `public.historico_alteracoes` (Audit Log)
-
-Registra todas as alterações importantes no sistema para auditoria.
-
-| Coluna | Tipo | Obrigatório | Descrição |
-|:---|:---|:---|:---|
-| `id` | `bigserial` | Sim | Chave primária |
-| `schema_name` | `text` | Sim | Nome do schema |
-| `table_name` | `text` | Sim | Nome da tabela |
-| `record_id` | `text` | Sim | ID do registro alterado |
-| `old_data` | `jsonb` | Não | Dados antes da alteração |
-| `new_data` | `jsonb` | Não | Dados após a alteração |
-| `action` | `text` | Sim | `INSERT`, `UPDATE`, `DELETE` |
-| `changed_by` | `uuid` | Não | FK para `auth.users` |
-| `changed_at` | `timestamptz` | Sim | Data/hora da alteração |
+| `id` | uuid (PK) | Identificador único |
+| `id_emissao_comercial` | uuid (FK) | Referência à emissão no comercial |
+| `numero_emissao` | text | Código da emissão (ex: EM-20260115-0019) |
+| `nome_operacao` | text | Nome descritivo da operação |
+| `status` | text | Status atual (Em Estruturação, Liquidada, etc.) |
+| `pmo_id` | uuid (FK) | PMO responsável |
+| `analista_gestao_id` | uuid (FK) | Analista de gestão atribuído |
+| `analista_financeiro_id` | uuid (FK) | Analista financeiro (via hierarquia) |
+| `analista_contabil_id` | uuid (FK) | Analista contábil (via hierarquia) |
+| `categoria_id` | int (FK) | CRI, CRA, DEB, etc. |
+| `veiculo_id` | int (FK) | Patrimônio Separado ou Veículo Exclusivo |
+| `tipo_oferta_id` | int (FK) | Tipo de oferta |
+| `volume` | numeric | Volume total da operação |
+| `empresa_cnpj` | text | CNPJ da empresa |
+| `data_entrada_pipe` | date | Data de entrada no pipeline |
+| `data_previsao_liquidacao` | date | Previsão de liquidação |
+| `data_liquidacao` | date | Data efetiva de liquidação |
+| `floating` | boolean | Se é operação floating |
+| `proximos_passos` | text | Próximos passos |
+| `alertas` | text | Alertas e observações |
+| `resumo` | text | Resumo da operação |
+| `criado_em` | timestamptz | Data de criação |
+| `atualizado_em` | timestamptz | Data da última atualização |
 
 ---
 
-## 5. Scripts SQL para Criação das Tabelas
+## 7. Scripts SQL para Criação das Tabelas
 
-### 5.1. Criação do Schema e Tabelas Principais
+### 7.1. Criação do Schema e Tabelas
 
 ```sql
 -- =====================================================
--- SCRIPT DE CRIAÇÃO DO SCHEMA ESTRUTURACAO
+-- CRIAÇÃO DO SCHEMA E TABELAS
 -- =====================================================
 
--- 1. Criar o schema
+-- Criar schema de estruturação
 CREATE SCHEMA IF NOT EXISTS estruturacao;
 
--- 2. Tabela de Analistas de Gestão (referência)
+-- 1. Tabela de Analistas de Gestão
 CREATE TABLE IF NOT EXISTS estruturacao.analistas_gestao (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     nome text NOT NULL,
     email text,
-    tipo text NOT NULL CHECK (tipo IN ('gestao', 'financeiro', 'contabil')),
-    ativo boolean NOT NULL DEFAULT true,
+    ativo boolean DEFAULT true,
     criado_em timestamptz DEFAULT now()
 );
 
--- 3. Tabela de Hierarquia de Analistas
+-- 2. Tabela de Hierarquia de Analistas
 CREATE TABLE IF NOT EXISTS estruturacao.hierarquia_analistas (
-    analista_gestao_id uuid PRIMARY KEY REFERENCES estruturacao.analistas_gestao(id),
-    analista_financeiro_id uuid NOT NULL REFERENCES estruturacao.analistas_gestao(id),
-    analista_contabil_id uuid NOT NULL REFERENCES estruturacao.analistas_gestao(id)
-);
-
--- 4. Tabela Central de Operações
-CREATE TABLE IF NOT EXISTS estruturacao.operacoes (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_emissao_comercial uuid UNIQUE REFERENCES public.emissoes(id),
-    numero_emissao text NOT NULL,
-    nome_operacao text NOT NULL,
-    status text NOT NULL DEFAULT 'Em Estruturação' 
-        CHECK (status IN ('Em Estruturação', 'Liquidada', 'On Hold', 'Abortada', 'Finalizada')),
-    pmo_id uuid REFERENCES auth.users(id),
+    id serial PRIMARY KEY,
     analista_gestao_id uuid REFERENCES estruturacao.analistas_gestao(id),
     analista_financeiro_id uuid REFERENCES estruturacao.analistas_gestao(id),
     analista_contabil_id uuid REFERENCES estruturacao.analistas_gestao(id),
-    categoria_id uuid,
-    veiculo_id uuid,
-    tipo_oferta_id uuid,
-    lastro_id uuid,
-    volume numeric(18,2) NOT NULL DEFAULT 0,
+    UNIQUE(analista_gestao_id)
+);
+
+-- 3. Tabela de Perfis de Usuário
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    nome text NOT NULL,
+    email text NOT NULL,
+    perfil text NOT NULL CHECK (perfil IN ('admin', 'gestor_estruturacao', 'analista_estruturacao', 'gestor_gestao')),
+    criado_em timestamptz DEFAULT now()
+);
+
+-- 4. Tabela Principal de Operações
+CREATE TABLE IF NOT EXISTS estruturacao.operacoes (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_emissao_comercial uuid REFERENCES public.emissoes(id),
+    numero_emissao text,
+    nome_operacao text NOT NULL,
+    status text DEFAULT 'Em Estruturação' CHECK (status IN ('Em Estruturação', 'Liquidada', 'On Hold', 'Abortada', 'Finalizada')),
+    pmo_id uuid REFERENCES public.user_profiles(id),
+    analista_gestao_id uuid REFERENCES estruturacao.analistas_gestao(id),
+    analista_financeiro_id uuid REFERENCES estruturacao.analistas_gestao(id),
+    analista_contabil_id uuid REFERENCES estruturacao.analistas_gestao(id),
+    categoria_id int,
+    veiculo_id int,
+    tipo_oferta_id int,
+    volume numeric DEFAULT 0,
     empresa_cnpj text,
-    empresa_razao_social text,
-    data_entrada_pipe timestamptz NOT NULL DEFAULT now(),
+    data_entrada_pipe date DEFAULT CURRENT_DATE,
     data_previsao_liquidacao date,
     data_liquidacao date,
-    data_primeira_pagamento date,
-    fee_estruturacao numeric(10,4),
-    fee_gestao numeric(10,4),
-    fee_originacao numeric(10,4),
-    boletagem text,
-    df text,
-    banco text,
-    agencia text,
-    conta_bancaria text,
-    majoracao numeric(10,4),
     floating boolean DEFAULT false,
     proximos_passos text,
     alertas text,
-    status_tech text,
     resumo text,
-    investidores_obs text,
     criado_em timestamptz DEFAULT now(),
     atualizado_em timestamptz DEFAULT now()
 );
@@ -477,27 +739,27 @@ CREATE TABLE IF NOT EXISTS estruturacao.operacoes (
 CREATE TABLE IF NOT EXISTS estruturacao.pendencias (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     operacao_id uuid NOT NULL REFERENCES estruturacao.operacoes(id) ON DELETE CASCADE,
-    mapa_liquidacao text NOT NULL DEFAULT 'pendente' CHECK (mapa_liquidacao IN ('ok', 'nok', 'pendente')),
-    mapa_registros text NOT NULL DEFAULT 'pendente' CHECK (mapa_registros IN ('ok', 'nok', 'pendente')),
-    lo_status text NOT NULL DEFAULT 'pendente' CHECK (lo_status IN ('ok', 'nok', 'pendente')),
-    due_diligence text NOT NULL DEFAULT 'pendente' CHECK (due_diligence IN ('ok', 'nok', 'pendente')),
-    envio_email_prestadores text NOT NULL DEFAULT 'pendente' CHECK (envio_email_prestadores IN ('ok', 'nok', 'pendente')),
-    passagem_bastao text NOT NULL DEFAULT 'pendente' CHECK (passagem_bastao IN ('ok', 'nok', 'pendente')),
-    kick_off text NOT NULL DEFAULT 'pendente' CHECK (kick_off IN ('ok', 'nok', 'pendente')),
-    resolvida boolean NOT NULL DEFAULT false,
+    mapa_liquidacao text DEFAULT 'Pendente' CHECK (mapa_liquidacao IN ('OK', 'Pendente', 'N/A')),
+    mapa_registros text DEFAULT 'Pendente' CHECK (mapa_registros IN ('OK', 'Pendente', 'N/A')),
+    lo text DEFAULT 'Pendente' CHECK (lo IN ('OK', 'Pendente', 'N/A')),
+    dd text DEFAULT 'Pendente' CHECK (dd IN ('OK', 'Pendente', 'N/A')),
+    envio_email_prestadores text DEFAULT 'Pendente' CHECK (envio_email_prestadores IN ('OK', 'Pendente', 'N/A')),
+    passagem_bastao text DEFAULT 'Pendente' CHECK (passagem_bastao IN ('OK', 'Pendente', 'N/A')),
+    kick_off text DEFAULT 'Pendente' CHECK (kick_off IN ('OK', 'Pendente', 'N/A')),
+    todas_resolvidas boolean DEFAULT false,
     criado_em timestamptz DEFAULT now(),
-    atualizado_em timestamptz DEFAULT now()
+    atualizado_em timestamptz DEFAULT now(),
+    UNIQUE(operacao_id)
 );
 
 -- 6. Tabela de Compliance Checks
 CREATE TABLE IF NOT EXISTS estruturacao.compliance_checks (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     operacao_id uuid NOT NULL REFERENCES estruturacao.operacoes(id) ON DELETE CASCADE,
-    documento text NOT NULL,
-    tipo_documento text NOT NULL CHECK (tipo_documento IN ('CPF', 'CNPJ')),
+    tipo text NOT NULL,
+    cnpj_cpf text NOT NULL,
     nome_entidade text,
-    tipo_entidade text,
-    status text NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente', 'em_analise', 'aprovado', 'reprovado')),
+    status text DEFAULT 'pendente' CHECK (status IN ('pendente', 'em_analise', 'aprovado', 'reprovado')),
     responsavel_id uuid REFERENCES auth.users(id),
     observacoes text,
     data_verificacao timestamptz,
@@ -526,7 +788,7 @@ CREATE INDEX IF NOT EXISTS idx_compliance_operacao ON estruturacao.compliance_ch
 CREATE INDEX IF NOT EXISTS idx_audit_table ON public.historico_alteracoes(table_name, changed_at);
 ```
 
-### 5.2. Triggers e Functions
+### 7.2. Triggers e Functions
 
 ```sql
 -- =====================================================
@@ -652,7 +914,7 @@ CREATE TRIGGER audit_compliance
     FOR EACH ROW EXECUTE FUNCTION log_alteracao();
 ```
 
-### 5.3. Row Level Security (RLS)
+### 7.3. Row Level Security (RLS)
 
 ```sql
 -- =====================================================
@@ -717,9 +979,9 @@ CREATE POLICY "admin_manage_analistas" ON estruturacao.analistas_gestao
 
 ---
 
-## 6. Migração de Dados
+## 8. Migração de Dados
 
-### 6.1. Mapeamento de Colunas
+### 8.1. Mapeamento de Colunas
 
 A tabela a seguir mapeia as colunas da planilha para as colunas do banco de dados:
 
@@ -733,23 +995,9 @@ A tabela a seguir mapeia as colunas da planilha para as colunas do banco de dado
 | Veículo | `veiculo_id` | Buscar ID do veículo |
 | Emissão | `numero_emissao` | Direto |
 | Volume | `volume` | Converter para numérico |
-| Remuneração | `fee_gestao` | Converter para decimal |
-| Lastro | `lastro_id` | Buscar ID do lastro |
-| Tipo Operação | `tipo_oferta_id` | Buscar ID do tipo |
-| Boletagem | `boletagem` | Mapear valores |
-| Data de Entrada no Pipe | `data_entrada_pipe` | Converter formato |
-| Próximos Passos | `proximos_passos` | Direto |
-| Alertas | `alertas` | Direto |
-| Floating | `floating` | Converter para boolean |
 | Status | `status` | Mapear valores |
-| Tech | `status_tech` | Direto |
-| Resumo | `resumo` | Direto |
-| Analista Gestão | `analista_gestao_id` | Buscar ID pelo nome |
-| Investidores | `investidores_obs` | Direto |
-| Data de Liquidação | `data_liquidacao` | Converter formato |
-| 1ª Data de Pagamento | `data_primeira_pagamento` | Converter formato |
 
-### 6.2. Script de Migração (Python)
+### 8.2. Script de Migração (Python)
 
 ```python
 import pandas as pd
@@ -769,14 +1017,6 @@ def carregar_planilha(caminho: str) -> dict:
         'historico': pd.read_excel(caminho, sheet_name='Histórico'),
         'pendencias': pd.read_excel(caminho, sheet_name='Pendências')
     }
-
-def buscar_referencias():
-    """Busca IDs das tabelas de referência."""
-    categorias = {r['codigo']: r['id'] for r in supabase.table('categorias').select('id, codigo').execute().data}
-    veiculos = {r['sigla']: r['id'] for r in supabase.table('veiculos').select('id, sigla').execute().data}
-    usuarios = {r['nome']: r['id'] for r in supabase.table('user_profiles').select('id, nome').execute().data}
-    analistas = {r['nome']: r['id'] for r in supabase.schema('estruturacao').table('analistas_gestao').select('id, nome').execute().data}
-    return categorias, veiculos, usuarios, analistas
 
 def converter_data(valor):
     """Converte diferentes formatos de data para ISO."""
@@ -846,9 +1086,9 @@ if __name__ == "__main__":
 
 ---
 
-## 7. Sistema de Autenticação e Perfis
+## 9. Sistema de Autenticação e Perfis
 
-### 7.1. Perfis de Usuário
+### 9.1. Perfis de Usuário
 
 | Perfil | Descrição | Permissões |
 |:---|:---|:---|
@@ -857,7 +1097,7 @@ if __name__ == "__main__":
 | `analista_estruturacao` | Analista de estruturação (PMO) | Editar todas as operações, gerenciar compliance |
 | `gestor_gestao` | Gestor da equipe de gestão pós-liquidação | Visualizar pipeline, atribuir analistas de gestão às operações liquidadas |
 
-### 7.2. Fluxo de Autenticação
+### 9.2. Fluxo de Autenticação
 
 O sistema utilizará o Supabase Auth com as seguintes configurações:
 
@@ -867,13 +1107,13 @@ O sistema utilizará o Supabase Auth com as seguintes configurações:
 
 ---
 
-## 8. Automação de E-mails
+## 10. Automação de E-mails
 
-### 8.1. Configuração do Resend
+### 10.1. Configuração do Resend
 
 O serviço de e-mail **Resend** será utilizado para envios automáticos. A configuração será feita através de uma Supabase Edge Function.
 
-### 8.2. Tipos de E-mail
+### 10.2. Tipos de E-mail
 
 | Tipo | Destinatário | Gatilho | Conteúdo |
 |:---|:---|:---|:---|
@@ -882,7 +1122,7 @@ O serviço de e-mail **Resend** será utilizado para envios automáticos. A conf
 | Relatório Financeiro | Analistas Financeiros | Semanal (cron) | Resumo financeiro das operações |
 | Nova Atribuição | PMO/Analista | Evento (trigger) | Notificação de nova operação atribuída |
 
-### 8.3. Exemplo de Edge Function
+### 10.3. Exemplo de Edge Function
 
 ```typescript
 // supabase/functions/enviar-email-compliance/index.ts
@@ -941,9 +1181,9 @@ serve(async (req) => {
 
 ---
 
-## 9. Estrutura do Frontend
+## 11. Estrutura do Frontend
 
-### 9.1. Páginas da Aplicação
+### 11.1. Páginas da Aplicação
 
 | Página | Rota | Descrição | Perfis com Acesso |
 |:---|:---|:---|:---|
@@ -956,20 +1196,7 @@ serve(async (req) => {
 | Admin | `/admin` | Gerenciamento de usuários e configurações | `admin` |
 | Meu Perfil | `/perfil` | Configurações do usuário (ex: toggle Dark Mode) | Todos autenticados |
 
-### 9.2. Componentes Principais
-
-A interface utilizará a biblioteca **shadcn/ui** com as seguintes implementações-chave:
-
-| Componente | Localização | Descrição |
-|:---|:---|:---|
-| `DataTable` | `/components/ui/data-table.tsx` | Tabela avançada baseada em `tanstack/react-table` |
-| `SheetOperacao` | `/components/estruturacao/sheet-operacao.tsx` | Modal de detalhes com abas e formulários |
-| `KanbanBoard` | `/components/pendencias/kanban-board.tsx` | Kanban com drag-and-drop usando `dnd-kit` |
-| `StatusBadge` | `/components/ui/status-badge.tsx` | Badge colorido por status |
-| `Header` | `/components/layout/header.tsx` | Cabeçalho com navegação e toggle de tema |
-| `ComplianceWorkflow` | `/components/estruturacao/compliance-workflow.tsx` | Workflow visual de compliance |
-
-### 9.3. Bibliotecas Adicionais a Instalar
+### 11.2. Bibliotecas Adicionais a Instalar
 
 ```bash
 # Animações
@@ -990,37 +1217,41 @@ npm install react-number-format
 
 ---
 
-## 10. Cronograma de Implementação
+## 12. Cronograma de Implementação
 
 | Fase | Atividades | Duração Estimada |
 |:---|:---|:---|
+| **Fase 0: Correção Urgente** | Corrigir Dark Mode conforme Seção 3 | 1 dia |
 | **Fase 1: Backend** | Criação do schema, tabelas, triggers e RLS no Supabase | 3-4 dias |
 | **Fase 2: Migração** | Execução e validação do script de migração de dados | 2-3 dias |
-| **Fase 3: Frontend - Base** | Configuração do Design System (theming, fontes), Header, Navegação e Autenticação | 3-4 dias |
+| **Fase 3: Frontend - Base** | Aplicar prompt da Seção 4 para refatorar UI (Header, Tabela, StatusBar) | 3-4 dias |
 | **Fase 4: Frontend - Core** | Desenvolvimento da página de Pipeline com DataTable e o Sheet de Detalhes | 5-7 dias |
 | **Fase 5: Frontend - Módulos** | Desenvolvimento das páginas de Pendências (Kanban) e Histórico | 3-5 dias |
 | **Fase 6: Automação** | Implementação das Edge Functions para e-mails | 2-3 dias |
 | **Fase 7: Finalização** | Testes integrados, ajustes de responsividade e polimento de animações | 3-5 dias |
-| **Total** | | **21-31 dias** |
+| **Total** | | **22-32 dias** |
 
 ---
 
-## 11. Próximos Passos
+## 13. Próximos Passos
 
-1. **Aprovação do Plano**: Validar este documento e esclarecer dúvidas pendentes.
-2. **Execução da Fase 1 (Backend)**: Iniciar a implementação da estrutura no Supabase.
-3. **Setup do Projeto Frontend**: Configurar o tema do `shadcn/ui` e instalar `framer-motion`.
-4. **Desenvolvimento Iterativo**: Seguir as fases do cronograma, começando pela autenticação e a tela principal do Pipeline.
+1. **Correção Imediata do Dark Mode**: Siga o passo a passo da Seção 3 para consertar o problema do tema.
+2. **Executar Prompt de Evolução da UI**: Utilize o prompt da Seção 4 com um assistente de IA para gerar a nova interface.
+3. **Validar e Integrar**: Revise e integre o código gerado na aplicação.
+4. **Executar Migrações SQL**: Rodar os scripts da Seção 7 no Supabase.
+5. **Continuar Desenvolvimento**: Prossiga com as demais fases do cronograma.
 
 ---
 
-## 12. Referências
+## 14. Referências
 
 - [1] Documentação do Supabase: [https://supabase.com/docs](https://supabase.com/docs)
 - [2] Supabase Row Level Security: [https://supabase.com/docs/guides/auth/row-level-security](https://supabase.com/docs/guides/auth/row-level-security)
 - [3] Biblioteca de Componentes shadcn/ui: [https://ui.shadcn.com/](https://ui.shadcn.com/)
-- [4] Framer Motion (Animações): [https://www.framer.com/motion/](https://www.framer.com/motion/)
-- [5] TanStack Table v8: [https://tanstack.com/table/v8](https://tanstack.com/table/v8)
-- [6] DND Kit (Drag and Drop): [https://dndkit.com/](https://dndkit.com/)
-- [7] Serviço de E-mail Resend: [https://resend.com/](https://resend.com/)
-- [8] 10 Best UI/UX Dashboard Design Principles for 2025 (Medium): [https://medium.com/@farazjonanda/10-best-ui-ux-dashboard-design-principles-for-2025-2f9e7c21a454](https://medium.com/@farazjonanda/10-best-ui-ux-dashboard-design-principles-for-2025-2f9e7c21a454)
+- [4] shadcn/ui Dark Mode: [https://ui.shadcn.com/docs/dark-mode/vite](https://ui.shadcn.com/docs/dark-mode/vite)
+- [5] Framer Motion (Animações): [https://www.framer.com/motion/](https://www.framer.com/motion/)
+- [6] TanStack Table v8: [https://tanstack.com/table/v8](https://tanstack.com/table/v8)
+- [7] DND Kit (Drag and Drop): [https://dndkit.com/](https://dndkit.com/)
+- [8] Serviço de E-mail Resend: [https://resend.com/](https://resend.com/)
+- [9] Google Fonts - DM Serif Display: [https://fonts.google.com/specimen/DM+Serif+Display](https://fonts.google.com/specimen/DM+Serif+Display)
+- [10] Skill `frontend-design` (documentação interna)

@@ -25,6 +25,8 @@ export function Navigation() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Linha de destaque brutalista */}
+      <div className="h-0.5 bg-blue-600 dark:bg-blue-400" aria-hidden="true" />
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <Link to="/" className="mr-6 flex items-center space-x-2">
