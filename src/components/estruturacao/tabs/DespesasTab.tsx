@@ -76,6 +76,7 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
             grossUp: linha.gross_up || 0,
             valorBruto: linha.valor_recorrente_bruto || linha.preco_recorrente || 0,
             tipo: 'auto',
+            origem: (linha as any).origem || 'manual',
             id_prestador: linha.id_prestador,
             periodicidade: 'mensal',
           });
@@ -89,6 +90,7 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
             grossUp: linha.gross_up || 0,
             valorBruto: linha.valor_recorrente_bruto || linha.preco_recorrente || 0,
             tipo: 'auto',
+            origem: (linha as any).origem || 'manual',
             id_prestador: linha.id_prestador,
             periodicidade: 'anual',
           });
@@ -103,6 +105,7 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
               grossUp: linha.gross_up || 0,
               valorBruto: linha.valor_upfront_bruto || linha.preco_upfront,
               tipo: 'auto',
+              origem: (linha as any).origem || 'manual',
               id_prestador: linha.id_prestador,
               periodicidade: null,
             });

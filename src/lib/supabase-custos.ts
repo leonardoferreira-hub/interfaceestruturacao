@@ -16,6 +16,7 @@ function uuidv4() {
 interface CustoLinha {
   /** Mantém id estável para permitir upsert sem apagar tudo */
   id?: string;
+  origem?: 'manual' | 'auto';
   papel: string;
   id_prestador: string | null;
   tipo_preco: string;
@@ -48,6 +49,7 @@ interface SalvarCustosPayload {
 export function convertToApiFormat(items: CostItem[], type: CostType): CustoLinha[] {
   return items.map((item) => ({
     id: item.id,
+    origem: item.origem || (item.tipo === 'auto' ? 'auto' : 'manual'),
     papel: item.papel || item.prestador,
     id_prestador: item.id_prestador || null,
     tipo_preco: item.tipo === 'input' ? 'fixo' : 'auto',
@@ -116,6 +118,7 @@ export async function salvarCustos(
         id,
         id_custos_emissao: idCustos,
         ...c,
+        origem: c.origem || 'manual',
         atualizado_em: now,
       };
     });

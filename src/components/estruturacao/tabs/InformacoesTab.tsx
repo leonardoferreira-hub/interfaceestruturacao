@@ -140,6 +140,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
       const items: any[] = [];
       if (upfront > 0) {
         items.push({
+          origem: 'auto',
           papel: c.papel,
           id_prestador: c.id_prestador ?? null,
           tipo_preco,
@@ -153,6 +154,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
       }
       if (recorr > 0) {
         items.push({
+          origem: 'auto',
           papel: c.papel,
           id_prestador: c.id_prestador ?? null,
           tipo_preco,
@@ -167,8 +169,8 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
       return items;
     });
 
-    // IMPORTANTE: não apagar custos que já estavam preenchidos manualmente.
-    // Estratégia: preserva linhas existentes que não forem recalculadas e tenta reaproveitar IDs.
+    // Regra: ao recalcular, SUBSTITUIR apenas custos automáticos (origem='auto'),
+    // mantendo custos manuais intactos.
     const { data: custosEmissaoRow, error: custosEmissaoErr } = await supabase
       .from('custos_emissao')
       .select('id')
@@ -184,12 +186,13 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
 
     const keyOf = (l: any) => `${l.papel}::${l.periodicidade ?? 'upfront'}`;
     const existingByKey = new Map((existingLinhas || []).map((l: any) => [keyOf(l), l]));
-    const recalcKeys = new Set(linhasRecalc.map((l) => keyOf(l)));
 
-    const linhasPreservadas = (existingLinhas || [])
-      .filter((l: any) => !recalcKeys.has(keyOf(l)))
+    // preservar apenas MANUAIS (e não preservar automáticos antigos)
+    const linhasManuais = (existingLinhas || [])
+      .filter((l: any) => (l.origem || 'manual') !== 'auto')
       .map((l: any) => ({
         id: l.id,
+        origem: (l.origem || 'manual') as any,
         papel: l.papel,
         id_prestador: l.id_prestador ?? null,
         tipo_preco: l.tipo_preco,
@@ -201,12 +204,13 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
         valor_recorrente_bruto: l.valor_recorrente_bruto || 0,
       }));
 
-    const linhas = [...linhasRecalc].map((l) => {
+    // reaproveitar IDs quando possível (por chave papel+periodicidade)
+    const linhasAuto = [...linhasRecalc].map((l) => {
       const existing = existingByKey.get(keyOf(l));
       return existing ? { ...l, id: existing.id } : l;
     });
 
-    const merged = [...linhas, ...linhasPreservadas];
+    const merged = [...linhasAuto, ...linhasManuais];
 
     const total_upfront = merged.reduce((s, l) => s + (l.valor_upfront_bruto || 0), 0);
     const mensal = merged.filter((l) => l.periodicidade === 'mensal');

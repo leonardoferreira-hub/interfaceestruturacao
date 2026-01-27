@@ -15,6 +15,8 @@ export interface CostItem {
   grossUp: number;
   valorBruto: number;
   tipo: 'input' | 'calculado' | 'auto';
+  /** origem de persistência: manual (usuário) vs auto (recalculo) */
+  origem?: 'manual' | 'auto';
   // Campos adicionais para integração com Supabase
   id_prestador?: string | null;
   papel?: string;
