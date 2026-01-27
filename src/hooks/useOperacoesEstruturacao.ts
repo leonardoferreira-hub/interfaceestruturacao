@@ -23,6 +23,12 @@ export interface OperacaoEstruturacao {
   analista_gestao_nome: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
+
+  // campos da emissão (public.emissoes)
+  empresa_cnpj?: string | null;
+  empresa_razao_social?: string | null;
+  empresa_destinataria?: string | null;
+  empresa_nome_fantasia?: string | null;
 }
 
 // A lista da página inicial deve ser eficiente: use uma view no banco
