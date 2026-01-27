@@ -102,7 +102,15 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
     const categoria = categorias.find((c) => c.id === categoriaId)?.codigo || null;
     const veiculo = veiculos.find((v) => v.id === veiculoId)?.nome || null;
     const lastro = lastros.find((l) => l.id === lastroId)?.nome || null;
-    const tipo_oferta = tiposOferta.find((t) => t.id === tipoOfertaId)?.nome || null;
+    const rawTipoOferta = tiposOferta.find((t) => t.id === tipoOfertaId)?.nome || null;
+    // A Edge Function do Comercial espera strings no formato "Oferta Privada Pura" etc.
+    // Nossos lookups podem vir como "Privada Pura"/"CVM 160".
+    const tipo_oferta = (() => {
+      if (!rawTipoOferta) return null;
+      const s = String(rawTipoOferta);
+      if (/^oferta\s+/i.test(s)) return s;
+      return `Oferta ${s}`;
+    })();
 
     if (!categoria) throw new Error('Categoria inválida para recalcular');
 
@@ -117,6 +125,8 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
     const { data, error } = await supabase.functions.invoke('fluxo_custos_por_combinacao', {
       body: {
         categoria,
+        // compat: a edge function aceita "tipo_oferta" ou "oferta".
+        // usamos tipo_oferta já normalizado para casar com as chaves internas.
         tipo_oferta,
         veiculo,
         lastro,
