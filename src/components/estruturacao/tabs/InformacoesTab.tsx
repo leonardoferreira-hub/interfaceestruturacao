@@ -210,7 +210,32 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
       return existing ? { ...l, id: existing.id } : l;
     });
 
-    const merged = [...linhasAuto, ...linhasManuais];
+    // Deduplicar por chave (papel + periodicidade). Se houver conflito,
+    // preferir manual (usuário) > auto (recalculo).
+    const byKey = new Map<string, any>();
+    for (const row of [...linhasAuto, ...linhasManuais]) {
+      const key = keyOf(row);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, row);
+        continue;
+      }
+      const existingIsManual = (existing.origem || 'manual') !== 'auto';
+      const rowIsManual = (row.origem || 'manual') !== 'auto';
+      if (rowIsManual && !existingIsManual) {
+        byKey.set(key, row);
+      }
+    }
+
+    // Garantir IDs únicos (Postgres falha se o mesmo id aparecer duas vezes no upsert)
+    const usedIds = new Set<string>();
+    const merged = Array.from(byKey.values()).map((r: any) => {
+      if (r.id && usedIds.has(r.id)) {
+        return { ...r, id: crypto.randomUUID() };
+      }
+      if (r.id) usedIds.add(r.id);
+      return r;
+    });
 
     const total_upfront = merged.reduce((s, l) => s + (l.valor_upfront_bruto || 0), 0);
     const mensal = merged.filter((l) => l.periodicidade === 'mensal');

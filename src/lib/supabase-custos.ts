@@ -112,8 +112,16 @@ export async function salvarCustos(
 
     const existingIds = new Set((existingLinhas ?? []).map((r: any) => r.id));
 
+    const seenIds = new Set<string>();
     const desiredRows = (payload.custos ?? []).map((c) => {
-      const id = c.id && existingIds.has(c.id) ? c.id : uuidv4();
+      let id = c.id && existingIds.has(c.id) ? c.id : uuidv4();
+
+      // Evitar duplicar o mesmo id no mesmo upsert (causa: "ON CONFLICT ... cannot affect row a second time")
+      if (seenIds.has(id)) {
+        id = uuidv4();
+      }
+      seenIds.add(id);
+
       return {
         id,
         id_custos_emissao: idCustos,
