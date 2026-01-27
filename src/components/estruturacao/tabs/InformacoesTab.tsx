@@ -9,11 +9,16 @@ import { useUpdateOperacao } from '@/hooks/useUpdateOperacao';
 import { useOperacao } from '@/hooks/useOperacoesEstruturacao';
 import { useUsuarios } from '@/hooks/useUsuarios';
 import { useCategorias, useVeiculos, useLastros, useTiposOferta } from '@/hooks/useLookups';
+import { useUpdateEmissao } from '@/hooks/useUpdateEmissao';
+import { useSeries } from '@/hooks/useEmissoes';
 import { formatCurrency } from '@/utils/formatters';
 import type { EmissaoDB } from '@/types/database';
 import type { StatusOkNok, StatusBoletagem } from '@/types/dados-estruturacao';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { salvarCustos } from '@/lib/supabase-custos';
 import {
   EditableTextField,
   EditableDateField,
@@ -32,21 +37,39 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
   const { data: operacaoAtual } = useOperacao(emissao.id);
   const operacao = (operacaoAtual || emissao) as any;
 
-  const { data: dadosEstruturacao, isLoading: loadingDados } = useDadosEstruturacao(operacao.id_emissao_comercial || emissao.id);
+  const emissaoComercialId = operacao.id_emissao_comercial || emissao.id;
+
+  const { data: dadosEstruturacao, isLoading: loadingDados } = useDadosEstruturacao(emissaoComercialId);
   const { updateCampo } = useUpdateCampoEstruturacao();
   const updateOperacao = useUpdateOperacao();
+  const updateEmissao = useUpdateEmissao();
+  const queryClient = useQueryClient();
   
   const { data: usuarios = [] } = useUsuarios();
   const { data: categorias = [] } = useCategorias();
   const { data: veiculos = [] } = useVeiculos();
   const { data: lastros = [] } = useLastros();
   const { data: tiposOferta = [] } = useTiposOferta();
+  const { data: series = [] } = useSeries(emissaoComercialId);
+
+  const { data: emissaoComercial } = useQuery({
+    queryKey: ['emissao-comercial', emissaoComercialId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('emissoes')
+        .select('id, categoria, veiculo, lastro, tipo_oferta, volume')
+        .eq('id', emissaoComercialId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!emissaoComercialId,
+  });
 
   // Handlers para campos de estruturação
   const handleUpdateEstruturacao = async (campo: string, valor: unknown) => {
-    const idEmissao = operacao.id_emissao_comercial || emissao.id;
     try {
-      await updateCampo(idEmissao, campo, valor);
+      await updateCampo(emissaoComercialId, campo, valor);
       toast.success('Salvo');
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar');
@@ -57,6 +80,134 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
   const handleUpdateOperacao = async (campo: string, valor: unknown) => {
     try {
       await updateOperacao.mutateAsync({ id: emissao.id, dados: { [campo]: valor } as any });
+      toast.success('Salvo');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar');
+    }
+  };
+
+  const recalcDespesasFromComercial = async (next: {
+    categoriaId?: string | null;
+    veiculoId?: string | null;
+    lastroId?: string | null;
+    tipoOfertaId?: string | null;
+    volume?: number | null;
+  }) => {
+    const categoriaId = next.categoriaId ?? emissaoComercial?.categoria ?? null;
+    const veiculoId = next.veiculoId ?? emissaoComercial?.veiculo ?? null;
+    const lastroId = next.lastroId ?? emissaoComercial?.lastro ?? null;
+    const tipoOfertaId = next.tipoOfertaId ?? emissaoComercial?.tipo_oferta ?? null;
+    const volume = (next.volume ?? emissaoComercial?.volume ?? operacao.volume ?? 0) as number;
+
+    const categoria = categorias.find((c) => c.id === categoriaId)?.codigo || null;
+    const veiculo = veiculos.find((v) => v.id === veiculoId)?.nome || null;
+    const lastro = lastros.find((l) => l.id === lastroId)?.nome || null;
+    const tipo_oferta = tiposOferta.find((t) => t.id === tipoOfertaId)?.nome || null;
+
+    if (!categoria) throw new Error('Categoria inválida para recalcular');
+
+    const seriesPayload = (series || []).map((s: any) => ({
+      numero: s.numero,
+      valor_emissao: s.valor_emissao,
+      prazo: s.prazo ?? undefined,
+    }));
+
+    toast.message('Recalculando despesas…');
+
+    const { data, error } = await supabase.functions.invoke('fluxo_custos_por_combinacao', {
+      body: {
+        categoria,
+        tipo_oferta,
+        veiculo,
+        lastro,
+        volume,
+        series: seriesPayload,
+      },
+    });
+
+    if (error) throw new Error(error.message);
+    if (!data?.success) throw new Error(data?.error || 'Falha ao recalcular custos');
+
+    const custos = (data?.data?.custos || []) as any[];
+
+    // converter para custos_linhas
+    const linhas = custos.flatMap((c) => {
+      const upfront = Number(c.valor_upfront_calculado ?? c.preco_upfront ?? 0) || 0;
+      const recorr = Number(c.valor_recorrente_calculado ?? c.preco_recorrente ?? 0) || 0;
+      const tipo_preco = c.tipo_preco === 'percentual' ? 'percentual' : 'fixo';
+      const periodicidade = (c.periodicidade ?? null) as string | null;
+
+      const items: any[] = [];
+      if (upfront > 0) {
+        items.push({
+          papel: c.papel,
+          id_prestador: c.id_prestador ?? null,
+          tipo_preco,
+          preco_upfront: upfront,
+          preco_recorrente: 0,
+          periodicidade: null,
+          gross_up: 0,
+          valor_upfront_bruto: upfront,
+          valor_recorrente_bruto: 0,
+        });
+      }
+      if (recorr > 0) {
+        items.push({
+          papel: c.papel,
+          id_prestador: c.id_prestador ?? null,
+          tipo_preco,
+          preco_upfront: 0,
+          preco_recorrente: recorr,
+          periodicidade: periodicidade || 'mensal',
+          gross_up: 0,
+          valor_upfront_bruto: 0,
+          valor_recorrente_bruto: recorr,
+        });
+      }
+      return items;
+    });
+
+    const total_upfront = linhas.reduce((s, l) => s + (l.valor_upfront_bruto || 0), 0);
+    const mensal = linhas.filter((l) => l.periodicidade === 'mensal');
+    const anual = linhas.filter((l) => l.periodicidade === 'anual');
+    const total_mensal = mensal.reduce((s, l) => s + (l.valor_recorrente_bruto || 0), 0);
+    const total_anual = anual.reduce((s, l) => s + (l.valor_recorrente_bruto || 0), 0);
+
+    const totais = {
+      total_upfront,
+      total_mensal,
+      total_anual,
+      total_primeiro_ano: total_upfront + total_anual + total_mensal * 12,
+      total_anos_subsequentes: total_anual + total_mensal * 12,
+    };
+
+    const res = await salvarCustos({
+      id_emissao_comercial: emissaoComercialId,
+      custos: linhas,
+      totais,
+    });
+
+    if (!res.success) throw new Error(res.error || 'Falha ao salvar despesas recalculadas');
+
+    // refresh UI
+    queryClient.invalidateQueries({ queryKey: ['custos', emissaoComercialId] });
+    queryClient.invalidateQueries({ queryKey: ['custos-linhas'] });
+    toast.success('Despesas recalculadas');
+  };
+
+  const handleUpdateComercial = async (campo: 'categoria' | 'veiculo' | 'lastro' | 'tipo_oferta', valor: string | null) => {
+    try {
+      await updateEmissao.mutateAsync({ id: emissaoComercialId, dados: { [campo]: valor } as any });
+
+      // recalcula ao mudar combinação
+      const next = {
+        categoriaId: campo === 'categoria' ? valor : undefined,
+        veiculoId: campo === 'veiculo' ? valor : undefined,
+        lastroId: campo === 'lastro' ? valor : undefined,
+        tipoOfertaId: campo === 'tipo_oferta' ? valor : undefined,
+      };
+      await recalcDespesasFromComercial(next);
+
       toast.success('Salvo');
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar');
@@ -149,100 +300,109 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
               onSave={(v) => handleUpdateOperacao('numero_emissao', v)}
             />
             
-            {/* Categoria */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Categoria</Label>
-              <Select 
-                value={operacao.categoria_id || '__none__'} 
-                onValueChange={(v) => handleUpdateOperacao('categoria_id', v === '__none__' ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="text-muted-foreground">Selecionar categoria</span>
-                  </SelectItem>
-                  {categorias.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.codigo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {(() => {
+              const categoriaId = (emissaoComercial?.categoria ?? null) as string | null;
+              const categoriaCodigo = categorias.find((c) => c.id === categoriaId)?.codigo ?? null;
+              const showLastro = categoriaCodigo === 'CRI' || categoriaCodigo === 'CRA';
 
-            {/* Veículo */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Veículo</Label>
-              <Select 
-                value={operacao.veiculo_id || '__none__'} 
-                onValueChange={(v) => handleUpdateOperacao('veiculo_id', v === '__none__' ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar veículo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="text-muted-foreground">Selecionar veículo</span>
-                  </SelectItem>
-                  {veiculos.map((veic) => (
-                    <SelectItem key={veic.id} value={veic.id}>
-                      {veic.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              return (
+                <>
+                  {/* Categoria (fonte: Comercial/public.emissoes) */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Categoria</Label>
+                    <Select
+                      value={categoriaId || '__none__'}
+                      onValueChange={(v) => handleUpdateComercial('categoria', v === '__none__' ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Selecionar categoria</span>
+                        </SelectItem>
+                        {categorias.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.codigo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* Lastro - apenas para CRI e CRA */}
-            {(operacao.categoria_id === 'b4fe5ff5-fc0d-4407-ba2a-b322f24fba17' || 
-              operacao.categoria_id === 'a884c86f-84ac-449b-843b-22744c21aa46') && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Lastro</Label>
-                <Select 
-                  value={operacao.lastro_id || '__none__'} 
-                  onValueChange={(v) => handleUpdateOperacao('lastro_id', v === '__none__' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar lastro" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">
-                      <span className="text-muted-foreground">Selecionar lastro</span>
-                    </SelectItem>
-                    {lastros.map((lastro) => (
-                      <SelectItem key={lastro.id} value={lastro.id}>
-                        {lastro.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                  {/* Veículo */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Veículo</Label>
+                    <Select
+                      value={(emissaoComercial?.veiculo ?? null) || '__none__'}
+                      onValueChange={(v) => handleUpdateComercial('veiculo', v === '__none__' ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar veículo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Selecionar veículo</span>
+                        </SelectItem>
+                        {veiculos.map((veic) => (
+                          <SelectItem key={veic.id} value={veic.id}>
+                            {veic.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* Tipo Oferta */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Tipo Oferta</Label>
-              <Select 
-                value={operacao.tipo_oferta_id || '__none__'} 
-                onValueChange={(v) => handleUpdateOperacao('tipo_oferta_id', v === '__none__' ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="text-muted-foreground">Selecionar tipo</span>
-                  </SelectItem>
-                  {tiposOferta.map((tipo) => (
-                    <SelectItem key={tipo.id} value={tipo.id}>
-                      {tipo.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  {/* Lastro - apenas para CRI e CRA */}
+                  {showLastro && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Lastro</Label>
+                      <Select
+                        value={(emissaoComercial?.lastro ?? null) || '__none__'}
+                        onValueChange={(v) => handleUpdateComercial('lastro', v === '__none__' ? null : v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar lastro" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <span className="text-muted-foreground">Selecionar lastro</span>
+                          </SelectItem>
+                          {lastros.map((l) => (
+                            <SelectItem key={l.id} value={l.id}>
+                              {l.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Tipo Oferta */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tipo Oferta</Label>
+                    <Select
+                      value={(emissaoComercial?.tipo_oferta ?? null) || '__none__'}
+                      onValueChange={(v) => handleUpdateComercial('tipo_oferta', v === '__none__' ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Selecionar tipo</span>
+                        </SelectItem>
+                        {tiposOferta.map((tipo) => (
+                          <SelectItem key={tipo.id} value={tipo.id}>
+                            {tipo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Volume e Majoração */}
             <div className="space-y-1">
