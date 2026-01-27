@@ -302,27 +302,33 @@ export function HistoricoAlteracoesTab({ idEmissao }: { idEmissao: string }) {
   const filtered = useMemo(() => {
     const rows = data ?? [];
 
-    return rows.filter((r) => {
-      // 1) Tabelas que carregam id_emissao direto no JSON
-      if (getEmissaoIdFromAudit(r) === idEmissao) return true;
+    return rows
+      .filter((r) => {
+        // 1) Tabelas que carregam id_emissao direto no JSON
+        if (getEmissaoIdFromAudit(r) === idEmissao) return true;
 
-      // 2) Custos: correlacionar via id_custos_emissao
-      const table = r.table_name?.toLowerCase?.() ?? '';
+        // 2) Custos: correlacionar via id_custos_emissao
+        const table = r.table_name?.toLowerCase?.() ?? '';
 
-      if (table === 'custos_emissao' && idCustosEmissao) {
-        return r.record_id === idCustosEmissao;
-      }
+        if (table === 'custos_emissao' && idCustosEmissao) {
+          return r.record_id === idCustosEmissao;
+        }
 
-      if (table === 'custos_linhas' && idCustosEmissao) {
-        const candidates = [
-          r?.new_data?.id_custos_emissao,
-          r?.old_data?.id_custos_emissao,
-        ].filter(Boolean);
-        return candidates.includes(idCustosEmissao);
-      }
+        if (table === 'custos_linhas' && idCustosEmissao) {
+          const candidates = [
+            r?.new_data?.id_custos_emissao,
+            r?.old_data?.id_custos_emissao,
+          ].filter(Boolean);
+          return candidates.includes(idCustosEmissao);
+        }
 
-      return false;
-    });
+        return false;
+      })
+      .filter((r) => {
+        // Não poluir o histórico com updates que não trazem diff útil
+        if (r.action !== 'UPDATE') return true;
+        return diffFields(r.old_data, r.new_data).length > 0;
+      });
   }, [data, idEmissao, idCustosEmissao]);
 
   if (isLoading) {
