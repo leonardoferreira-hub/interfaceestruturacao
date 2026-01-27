@@ -299,6 +299,23 @@ export function HistoricoAlteracoesTab({ idEmissao }: { idEmissao: string }) {
     enabled: !!idEmissao,
   });
 
+  // Baseline: não mostrar eventos "de criação" (setup inicial) — só mudanças pós-criação da emissão.
+  const { data: emissaoMeta } = useQuery({
+    queryKey: ['emissao_meta_for_audit', idEmissao],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('emissoes')
+        .select('criado_em')
+        .eq('id', idEmissao)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { criado_em: string | null } | null;
+    },
+    enabled: !!idEmissao,
+  });
+
+  const baselineChangedAt = emissaoMeta?.criado_em ? new Date(emissaoMeta.criado_em).getTime() : null;
+
   const filtered = useMemo(() => {
     const rows = data ?? [];
 
@@ -325,15 +342,19 @@ export function HistoricoAlteracoesTab({ idEmissao }: { idEmissao: string }) {
         return false;
       })
       .filter((r) => {
-        // Mostrar apenas ALTERAÇÕES: update/delete.
-        // (a criação inicial de registros gera muito ruído.)
-        if (r.action === 'INSERT') return false;
+        // Mostrar apenas ALTERAÇÕES (update) — deletions também geram ruído.
+        if (r.action !== 'UPDATE') return false;
 
         // Não poluir com updates que não trazem diff útil
-        if (r.action !== 'UPDATE') return true;
         return diffFields(r.old_data, r.new_data).length > 0;
+      })
+      .filter((r) => {
+        // Só após a criação da emissão (evita "setup inicial")
+        if (!baselineChangedAt) return true;
+        const t = new Date(r.changed_at).getTime();
+        return Number.isFinite(t) ? t > baselineChangedAt : true;
       });
-  }, [data, idEmissao, idCustosEmissao]);
+  }, [data, idEmissao, idCustosEmissao, baselineChangedAt]);
 
   if (isLoading) {
     return (
