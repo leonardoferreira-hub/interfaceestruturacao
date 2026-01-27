@@ -34,10 +34,12 @@ export function useUpdateEmissao() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['emissoes'] });
       queryClient.invalidateQueries({ queryKey: ['emissoes-estruturacao'] });
       queryClient.invalidateQueries({ queryKey: ['emissoes-com-detalhes'] });
+      // usado na InformacoesTab para carregar os campos do Comercial
+      queryClient.invalidateQueries({ queryKey: ['emissao-comercial', variables.id] });
     },
   });
 }
