@@ -8,7 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Building2, TrendingUp, FileText, ArrowUpRight, RefreshCcw } from 'lucide-react';
+import { Search, Loader2, Building2, TrendingUp, FileText, ArrowUpRight, RefreshCcw, Download } from 'lucide-react';
+import { exportAllEmissoesToExcel, exportEmissaoToExcel } from '@/lib/excel-export';
+import { toast } from 'sonner';
 
 const categoriaStyles: Record<string, string> = {
   CRI: 'bg-emerald-600/10 text-emerald-700 border-emerald-600/25',
@@ -57,6 +59,28 @@ const Index = () => {
     setDrawerOpen(true);
   };
 
+  const handleExportEmissao = async (operacao: OperacaoEstruturacao) => {
+    const id = (operacao as any).id_emissao_comercial || operacao.id;
+    if (!id) return;
+    try {
+      await exportEmissaoToExcel(id);
+      toast.success('Excel gerado');
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Falha ao exportar Excel');
+    }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      await exportAllEmissoesToExcel(filteredOperacoes as any);
+      toast.success('Excel gerado');
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Falha ao exportar Excel');
+    }
+  };
+
   // Stats
   const totalEmissoes = filteredOperacoes.length;
   const totalVolume = filteredOperacoes.reduce((acc, op) => acc + (op.volume || 0), 0);
@@ -86,6 +110,15 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExportAll}
+              className="gap-2"
+              title="Exportar todas as emissões (resumo + abas detalhadas)"
+            >
+              <Download className="h-4 w-4" />
+              Exportar Excel
+            </Button>
             <Button
               variant="outline"
               onClick={() => window.location.reload()}
@@ -200,9 +233,23 @@ const Index = () => {
                         <div className="text-xs text-muted-foreground truncate">
                           PMO: {operacao.pmo_nome || 'Não atribuído'}
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleRowClick(operacao); }}>
-                          <ArrowUpRight className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Exportar emissão em Excel"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportEmissao(operacao);
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleRowClick(operacao); }}>
+                            <ArrowUpRight className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -218,6 +265,7 @@ const Index = () => {
                         <TableHead>Categoria</TableHead>
                         <TableHead>Operação</TableHead>
                         <TableHead className="text-right">Volume</TableHead>
+                        <TableHead className="text-right">Export</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -239,6 +287,20 @@ const Index = () => {
                           </TableCell>
                           <TableCell className="text-right font-medium group-hover:bg-primary/5 transition-colors">
                             {formatCurrency(operacao.volume || 0)}
+                          </TableCell>
+                          <TableCell className="text-right group-hover:bg-primary/5 transition-colors">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Exportar emissão em Excel"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleExportEmissao(operacao);
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
