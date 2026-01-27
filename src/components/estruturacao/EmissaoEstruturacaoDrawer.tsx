@@ -1,7 +1,8 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// (scroll area removed)
+
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
@@ -9,13 +10,14 @@ import {
   TrendingUp,
   Calendar,
   Building2,
-  Banknote
+  Banknote,
+  History
 } from 'lucide-react';
 import type { EmissaoDB } from '@/types/database';
 import { DocumentosTab } from './tabs/DocumentosTab';
 import { InvestidoresTab } from './tabs/InvestidoresTab';
 import { FluxoCaixaTab } from './tabs/FluxoCaixaTab';
-import { EventosTab } from './tabs/EventosTab';
+import { HistoricoAlteracoesTab } from './tabs/HistoricoAlteracoesTab';
 import { InformacoesTab } from './tabs/InformacoesTab';
 import { SeriesTab } from './tabs/SeriesTab';
 import { DespesasTab } from './tabs/DespesasTab';
@@ -27,12 +29,18 @@ interface EmissaoEstruturacaoDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function EmissaoEstruturacaoDrawer({ 
-  emissao, 
-  open, 
-  onOpenChange 
+export function EmissaoEstruturacaoDrawer({
+  emissao,
+  open,
+  onOpenChange,
 }: EmissaoEstruturacaoDrawerProps) {
   if (!emissao) return null;
+
+  // A UI trabalha com duas origens:
+  // - comercial: public.emissoes (id = emissao.id)
+  // - estruturação: estruturacao.operacoes (id próprio; ref em id_emissao_comercial)
+  // Para tabs que leem/escrevem em public.*, sempre usar o id da emissão do comercial.
+  const emissaoComercialId = (emissao as any).id_emissao_comercial || emissao.id;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -98,8 +106,18 @@ export function EmissaoEstruturacaoDrawer({
           </motion.div>
         </SheetHeader>
 
-        <Tabs defaultValue="informacoes" className="flex flex-col h-[calc(100vh-140px)]">
-          <TabsList className="mx-6 mt-4 justify-start w-auto flex-wrap">
+        {/* Mobile: tabs em linha com scroll horizontal (evita quebrar layout) */}
+        <Tabs defaultValue="informacoes" className="flex flex-col h-[calc(100dvh-140px)] min-h-0">
+          <div className="relative px-4 sm:px-6 mt-4">
+            {/* fade à direita pra indicar scroll horizontal no mobile */}
+            <div
+              className="pointer-events-none absolute right-4 top-0 h-10 w-12 sm:hidden"
+              aria-hidden="true"
+            >
+              <div className="h-full w-full bg-gradient-to-l from-background via-background/80 to-transparent" />
+            </div>
+
+            <TabsList className="w-full justify-start flex-nowrap overflow-x-auto sm:overflow-visible sm:flex-wrap pr-10 sm:pr-1 [-webkit-overflow-scrolling:touch]">
             <TabsTrigger value="informacoes" className="gap-2">
               <Building2 className="h-4 w-4" />
               Visão Geral
@@ -120,13 +138,15 @@ export function EmissaoEstruturacaoDrawer({
               <Users className="h-4 w-4" />
               Investidores
             </TabsTrigger>
-            <TabsTrigger value="eventos" className="gap-2">
-              <Calendar className="h-4 w-4" />
-              Cronograma
+            <TabsTrigger value="historico" className="gap-2">
+              <History className="h-4 w-4" />
+              Histórico
             </TabsTrigger>
           </TabsList>
+          </div>
 
-          <ScrollArea className="flex-1 px-6 py-4">
+          {/* Conteúdo com scroll vertical */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 overscroll-contain [-webkit-overflow-scrolling:touch] outline-none focus:outline-none">
             <TabsContent value="informacoes" className="mt-0">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -134,7 +154,7 @@ export function EmissaoEstruturacaoDrawer({
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <InformacoesTab emissao={emissao} />
+                <InformacoesTab emissao={emissao as any} />
               </motion.div>
             </TabsContent>
             <TabsContent value="series" className="mt-0">
@@ -144,7 +164,7 @@ export function EmissaoEstruturacaoDrawer({
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <SeriesTab idEmissao={emissao.id} />
+                <SeriesTab idEmissao={emissaoComercialId} />
               </motion.div>
             </TabsContent>
             <TabsContent value="despesas" className="mt-0">
@@ -154,7 +174,7 @@ export function EmissaoEstruturacaoDrawer({
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <DespesasTab idEmissao={emissao.id} />
+                <DespesasTab idEmissao={emissaoComercialId} />
               </motion.div>
             </TabsContent>
             <TabsContent value="documentos" className="mt-0">
@@ -164,7 +184,7 @@ export function EmissaoEstruturacaoDrawer({
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <DocumentosTab idEmissao={emissao.id} />
+                <DocumentosTab idEmissao={emissaoComercialId} />
               </motion.div>
             </TabsContent>
             <TabsContent value="investidores" className="mt-0">
@@ -174,20 +194,20 @@ export function EmissaoEstruturacaoDrawer({
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <InvestidoresTab idEmissao={emissao.id} />
+                <InvestidoresTab idEmissao={emissaoComercialId} />
               </motion.div>
             </TabsContent>
-            <TabsContent value="eventos" className="mt-0">
+            <TabsContent value="historico" className="mt-0">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <EventosTab idEmissao={emissao.id} />
+                <HistoricoAlteracoesTab idEmissao={emissaoComercialId} />
               </motion.div>
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </SheetContent>
     </Sheet>

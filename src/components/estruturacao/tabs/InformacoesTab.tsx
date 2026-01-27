@@ -1,16 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useDadosEstruturacao, useUpdateCampoEstruturacao } from '@/hooks/useDadosEstruturacao';
-import { useUpdateEmissao } from '@/hooks/useUpdateEmissao';
+import { useUpdateOperacao } from '@/hooks/useUpdateOperacao';
+import { useOperacao } from '@/hooks/useOperacoesEstruturacao';
 import { useUsuarios } from '@/hooks/useUsuarios';
 import { useCategorias, useVeiculos, useLastros, useTiposOferta } from '@/hooks/useLookups';
 import { formatCurrency } from '@/utils/formatters';
 import type { EmissaoDB } from '@/types/database';
 import type { StatusOkNok, StatusBoletagem } from '@/types/dados-estruturacao';
 import { Loader2 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 import {
   EditableTextField,
   EditableDateField,
@@ -25,9 +28,13 @@ interface InformacoesTabProps {
 }
 
 export function InformacoesTab({ emissao }: InformacoesTabProps) {
-  const { data: dadosEstruturacao, isLoading: loadingDados } = useDadosEstruturacao(emissao.id);
+  // Para campos da OPERAÇÃO, precisamos do registro mais atual (selectedEmissao fica stale no state)
+  const { data: operacaoAtual } = useOperacao(emissao.id);
+  const operacao = (operacaoAtual || emissao) as any;
+
+  const { data: dadosEstruturacao, isLoading: loadingDados } = useDadosEstruturacao(operacao.id_emissao_comercial || emissao.id);
   const { updateCampo } = useUpdateCampoEstruturacao();
-  const updateEmissao = useUpdateEmissao();
+  const updateOperacao = useUpdateOperacao();
   
   const { data: usuarios = [] } = useUsuarios();
   const { data: categorias = [] } = useCategorias();
@@ -36,13 +43,24 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
   const { data: tiposOferta = [] } = useTiposOferta();
 
   // Handlers para campos de estruturação
-  const handleUpdateEstruturacao = (campo: string, valor: unknown) => {
-    updateCampo(emissao.id, campo, valor);
+  const handleUpdateEstruturacao = async (campo: string, valor: unknown) => {
+    const idEmissao = operacao.id_emissao_comercial || emissao.id;
+    try {
+      await updateCampo(idEmissao, campo, valor);
+      toast.success('Salvo');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar');
+    }
   };
 
-  // Handler para campos da emissão
-  const handleUpdateEmissao = (campo: string, valor: unknown) => {
-    updateEmissao.mutate({ id: emissao.id, dados: { [campo]: valor } as any });
+  // Handler para campos da operação (tabela estruturacao.operacoes)
+  const handleUpdateOperacao = async (campo: string, valor: unknown) => {
+    try {
+      await updateOperacao.mutateAsync({ id: emissao.id, dados: { [campo]: valor } as any });
+      toast.success('Salvo');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar');
+    }
   };
 
   if (loadingDados) {
@@ -53,24 +71,40 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
     );
   }
 
-  const isMajoracao = (emissao.volume || 0) > 50000000;
+  const isMajoracao = (operacao.volume || 0) > 50000000;
 
   return (
-    <div className="space-y-6">
-      {/* GESTÃO */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Gestão</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <UserSelectField
-              label="PMO"
-              value={dadosEstruturacao?.pmo_id}
-              usuarios={usuarios}
-              onSave={(v) => handleUpdateEstruturacao('pmo_id', v)}
-              placeholder="Selecionar PMO"
-            />
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="space-y-6">
+        {/* GESTÃO */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold tracking-tight">Gestão</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {(() => {
+              const PMO_ORDER = ['Leonardo', 'Lucas', 'Ronaldo', 'Beatriz', 'Eduarda'];
+              const pmos = PMO_ORDER
+                .map((n) => {
+                  const needle = n.toLowerCase();
+                  return usuarios.find((u) => (u.nome_completo || '').trim().toLowerCase() === needle);
+                })
+                .filter(Boolean) as typeof usuarios;
+
+              // Se a base ainda não tem os PMOs cadastrados (ou nomes diferentes), não deixa o select vazio.
+              const pmosFallback = pmos.length > 0 ? pmos : usuarios;
+
+              return (
+                <UserSelectField
+                  label="PMO"
+                  value={dadosEstruturacao?.pmo_id}
+                  usuarios={pmosFallback}
+                  onSave={(v) => handleUpdateEstruturacao('pmo_id', v)}
+                  placeholder="Selecionar PMO"
+                />
+              );
+            })()}
             <UserSelectField
               label="Analista Financeiro"
               value={dadosEstruturacao?.analista_financeiro_id}
@@ -92,35 +126,35 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
               onSave={(v) => handleUpdateEstruturacao('analista_gestao_id', v)}
               placeholder="Selecionar Analista"
             />
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* OPERAÇÃO */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Operação</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <EditableTextField
+        {/* OPERAÇÃO */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold tracking-tight">Operação</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <EditableTextField
               label="Nome da Operação"
-              value={emissao.nome_operacao}
-              onSave={(v) => handleUpdateEmissao('nome_operacao', v)}
+              value={operacao.nome_operacao}
+              onSave={(v) => handleUpdateOperacao('nome_operacao', v)}
               placeholder="Não informado"
             />
             <EditableTextField
               label="Número da Emissão"
-              value={emissao.numero_emissao}
-              onSave={(v) => handleUpdateEmissao('numero_emissao', v)}
+              value={operacao.numero_emissao}
+              onSave={(v) => handleUpdateOperacao('numero_emissao', v)}
             />
             
             {/* Categoria */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Categoria</Label>
               <Select 
-                value={emissao.categoria || '__none__'} 
-                onValueChange={(v) => handleUpdateEmissao('categoria', v === '__none__' ? null : v)}
+                value={operacao.categoria_id || '__none__'} 
+                onValueChange={(v) => handleUpdateOperacao('categoria_id', v === '__none__' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar categoria" />
@@ -131,7 +165,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
                   </SelectItem>
                   {categorias.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.codigo} - {cat.nome}
+                      {cat.codigo}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -142,8 +176,8 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Veículo</Label>
               <Select 
-                value={emissao.veiculo || '__none__'} 
-                onValueChange={(v) => handleUpdateEmissao('veiculo', v === '__none__' ? null : v)}
+                value={operacao.veiculo_id || '__none__'} 
+                onValueChange={(v) => handleUpdateOperacao('veiculo_id', v === '__none__' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar veículo" />
@@ -154,7 +188,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
                   </SelectItem>
                   {veiculos.map((veic) => (
                     <SelectItem key={veic.id} value={veic.id}>
-                      {veic.codigo} - {veic.nome}
+                      {veic.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -162,13 +196,13 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
             </div>
 
             {/* Lastro - apenas para CRI e CRA */}
-            {(emissao.categoria === 'b4fe5ff5-fc0d-4407-ba2a-b322f24fba17' || 
-              emissao.categoria === 'a884c86f-84ac-449b-843b-22744c21aa46') && (
+            {(operacao.categoria_id === 'b4fe5ff5-fc0d-4407-ba2a-b322f24fba17' || 
+              operacao.categoria_id === 'a884c86f-84ac-449b-843b-22744c21aa46') && (
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Lastro</Label>
                 <Select 
-                  value={emissao.lastro || '__none__'} 
-                  onValueChange={(v) => handleUpdateEmissao('lastro', v === '__none__' ? null : v)}
+                  value={operacao.lastro_id || '__none__'} 
+                  onValueChange={(v) => handleUpdateOperacao('lastro_id', v === '__none__' ? null : v)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecionar lastro" />
@@ -191,8 +225,8 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Tipo Oferta</Label>
               <Select 
-                value={emissao.tipo_oferta || '__none__'} 
-                onValueChange={(v) => handleUpdateEmissao('tipo_oferta', v === '__none__' ? null : v)}
+                value={operacao.tipo_oferta_id || '__none__'} 
+                onValueChange={(v) => handleUpdateOperacao('tipo_oferta_id', v === '__none__' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar tipo" />
@@ -214,7 +248,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Volume</Label>
               <div className="flex items-center gap-2">
-                <span className="font-medium">{formatCurrency(emissao.volume || 0)}</span>
+                <span className="font-medium">{formatCurrency(operacao.volume || 0)}</span>
                 {isMajoracao && (
                   <Badge variant="secondary" className="text-xs">
                     Majoração
@@ -228,18 +262,18 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
               value={dadosEstruturacao?.floating}
               onSave={(v) => handleUpdateEstruturacao('floating', v)}
             />
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* DATAS E FINANCEIRO */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Datas e Financeiro</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
+        {/* DATAS E FINANCEIRO */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold tracking-tight">Datas e Financeiro</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Data Entrada Pipe</Label>
               <p className="text-sm font-medium py-2">
                 {dadosEstruturacao?.data_entrada_pipe 
@@ -272,7 +306,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
 
           <Separator className="my-4" />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <EditableTextField
               label="Banco"
               value={dadosEstruturacao?.banco}
@@ -294,15 +328,17 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
           </div>
         </CardContent>
       </Card>
+      </div>
 
-      {/* STATUS E CHECKLIST */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Status e Checklist</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <StatusOkNokField
+      <div className="space-y-6">
+        {/* STATUS E CHECKLIST */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold tracking-tight">Status e Checklist</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <StatusOkNokField
               label="Compliance"
               value={dadosEstruturacao?.compliance as StatusOkNok}
               onSave={(v) => handleUpdateEstruturacao('compliance', v)}
@@ -353,54 +389,87 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
 
       {/* OBSERVAÇÕES */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Observações</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold tracking-tight">Observações</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <EditableTextField
-              label="Próximos Passos"
-              value={dadosEstruturacao?.proximos_passos}
-              onSave={(v) => handleUpdateEstruturacao('proximos_passos', v)}
-              placeholder="Descreva os próximos passos..."
-              multiline
-            />
-            <EditableTextField
-              label="Alertas"
-              value={dadosEstruturacao?.alertas}
-              onSave={(v) => handleUpdateEstruturacao('alertas', v)}
-              placeholder="Registre alertas importantes..."
-              multiline
-            />
-            <EditableTextField
-              label="Status Tech"
-              value={dadosEstruturacao?.status_tech}
-              onSave={(v) => handleUpdateEstruturacao('status_tech', v)}
-              placeholder="Status técnico da operação..."
-              multiline
-            />
-            <EditableTextField
-              label="Resumo"
-              value={dadosEstruturacao?.resumo}
-              onSave={(v) => handleUpdateEstruturacao('resumo', v)}
-              placeholder="Resumo da operação..."
-              multiline
-            />
-            <EditableTextField
-              label="Observações Investidores"
-              value={dadosEstruturacao?.investidores_obs}
-              onSave={(v) => handleUpdateEstruturacao('investidores_obs', v)}
-              placeholder="Observações sobre investidores..."
-              multiline
-            />
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              Notas rápidas por categoria (estilo Notion)
+            </div>
+
+            {/* Tabs internas para reduzir altura e ficar mais "produto" */}
+            <div className="overflow-x-auto">
+              <div className="min-w-max">
+                <Tabs defaultValue="proximos">
+                  <TabsList className="w-auto justify-start">
+                    <TabsTrigger value="proximos">Próximos</TabsTrigger>
+                    <TabsTrigger value="alertas">Alertas</TabsTrigger>
+                    <TabsTrigger value="tech">Tech</TabsTrigger>
+                    <TabsTrigger value="resumo">Resumo</TabsTrigger>
+                    <TabsTrigger value="investidores">Investidores</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="proximos" className="mt-4">
+                    <EditableTextField
+                      label="Próximos Passos"
+                      value={dadosEstruturacao?.proximos_passos}
+                      onSave={(v) => handleUpdateEstruturacao('proximos_passos', v)}
+                      placeholder="Descreva os próximos passos..."
+                      multiline
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="alertas" className="mt-4">
+                    <EditableTextField
+                      label="Alertas"
+                      value={dadosEstruturacao?.alertas}
+                      onSave={(v) => handleUpdateEstruturacao('alertas', v)}
+                      placeholder="Registre alertas importantes..."
+                      multiline
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="tech" className="mt-4">
+                    <EditableTextField
+                      label="Status Tech"
+                      value={dadosEstruturacao?.status_tech}
+                      onSave={(v) => handleUpdateEstruturacao('status_tech', v)}
+                      placeholder="Status técnico da operação..."
+                      multiline
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="resumo" className="mt-4">
+                    <EditableTextField
+                      label="Resumo"
+                      value={dadosEstruturacao?.resumo}
+                      onSave={(v) => handleUpdateEstruturacao('resumo', v)}
+                      placeholder="Resumo da operação..."
+                      multiline
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="investidores" className="mt-4">
+                    <EditableTextField
+                      label="Observações Investidores"
+                      value={dadosEstruturacao?.investidores_obs}
+                      onSave={(v) => handleUpdateEstruturacao('investidores_obs', v)}
+                      placeholder="Observações sobre investidores..."
+                      multiline
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* HISTÓRICO */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Histórico</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold tracking-tight">Histórico</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -425,6 +494,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+function uuidv4() {
+  // browser-safe uuid
+  return (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+}
+
+
 // Buscar custos de uma emissão específica
 export function useCustosEmissao(idEmissao: string | undefined) {
   return useQuery({
@@ -9,7 +21,7 @@ export function useCustosEmissao(idEmissao: string | undefined) {
       if (!idEmissao) return null;
       
       const { data, error } = await supabase
-        .from('custos')
+        .from('custos_emissao')
         .select('*')
         .eq('id_emissao', idEmissao)
         .maybeSingle();
@@ -30,7 +42,7 @@ export function useCustosLinhas(idCustosEmissao: string | undefined) {
       
       const { data, error } = await supabase
         .from('custos_linhas')
-        .select('*, prestador:prestadores(*)')
+        .select('*')
         .eq('id_custos_emissao', idCustosEmissao)
         .order('papel');
       
@@ -48,7 +60,7 @@ export function useUpdateCustos() {
   return useMutation({
     mutationFn: async ({ idEmissao, dados }: { idEmissao: string; dados: Record<string, number | null> }) => {
       const { data, error } = await supabase
-        .from('custos')
+        .from('custos_emissao')
         .update(dados)
         .eq('id_emissao', idEmissao)
         .select()
@@ -73,8 +85,8 @@ export function useCreateCustos() {
   return useMutation({
     mutationFn: async ({ idEmissao }: { idEmissao: string }) => {
       const { data, error } = await supabase
-        .from('custos')
-        .insert({ id_emissao: idEmissao })
+        .from('custos_emissao')
+        .insert({ id: uuidv4(), id_emissao: idEmissao })
         .select()
         .single();
       

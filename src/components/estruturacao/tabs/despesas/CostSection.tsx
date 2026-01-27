@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CostRow, type CostItem } from './CostRow';
+import { CostCard } from './CostCard';
 import { formatCurrency } from '@/utils/formatters';
 
 export type CostType = 'upfront' | 'anual' | 'mensal';
@@ -54,11 +55,22 @@ export function CostSection({ type, items, onChange, onItemSave, onItemDelete }:
     }
   };
 
+  const uuidv4 = () => {
+    // browser-safe uuid
+    return (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+  };
+
   const handleAdd = () => {
     onChange([
       ...items,
       {
-        id: `temp-${crypto.randomUUID()}`,
+        id: `temp-${uuidv4()}`,
         prestador: '',
         papel: '',
         valor: 0,
@@ -96,7 +108,34 @@ export function CostSection({ type, items, onChange, onItemSave, onItemDelete }:
         </div>
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg border border-border overflow-hidden">
+        {/* Mobile: cards */}
+        <div className="sm:hidden space-y-2">
+          {items.length === 0 ? (
+            <div className="rounded-lg border border-border p-4 text-center text-sm text-muted-foreground">
+              Nenhuma despesa adicionada
+            </div>
+          ) : (
+            <>
+              {items.map((item, index) => (
+                <CostCard
+                  key={item.id}
+                  item={item}
+                  onChange={(updated) => handleItemChange(index, updated)}
+                  onRemove={() => handleRemove(index)}
+                  onSave={(updated) => handleItemSave(index, updated)}
+                />
+              ))}
+
+              <div className="rounded-xl border border-border bg-muted/30 p-3 flex items-center justify-between">
+                <div className="text-sm font-semibold">TOTAL</div>
+                <div className="text-sm font-bold text-primary tabular-nums">{formatCurrency(total)}</div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Desktop/Tablet: table */}
+        <div className="hidden sm:block rounded-lg border border-border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">

@@ -91,9 +91,11 @@ export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5',
-        'text-xs font-medium uppercase tracking-wider',
-        'border rounded-none', // Cantos retos para estética brutalista
+        "inline-flex items-center gap-1 px-2.5 py-1",
+        "text-[11px] font-semibold tracking-wide",
+        "border rounded-full",
+        "shadow-sm shadow-black/0",
+        "transition-colors duration-150",
         config.border,
         config.bg,
         config.text,

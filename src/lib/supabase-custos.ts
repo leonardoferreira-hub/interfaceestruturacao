@@ -2,6 +2,17 @@ import { supabase } from '@/integrations/supabase/client';
 import type { CostItem } from '@/components/estruturacao/tabs/despesas/CostRow';
 import type { CostType } from '@/components/estruturacao/tabs/despesas/CostSection';
 
+function uuidv4() {
+  return (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+}
+
+
 interface CustoLinha {
   papel: string;
   id_prestador: string | null;
@@ -23,7 +34,8 @@ interface TotaisCustos {
 }
 
 interface SalvarCustosPayload {
-  id_emissao: string;
+  /** FK para a emissão do comercial (public.emissoes.id) */
+  id_emissao_comercial: string;
   custos: CustoLinha[];
   totais: TotaisCustos;
 }
@@ -46,23 +58,68 @@ export function convertToApiFormat(items: CostItem[], type: CostType): CustoLinh
 }
 
 /**
- * Salva custos usando a Edge Function do comercial
- * Isso garante histórico de versões (v1, v2, v3...)
+ * Salva custos direto no banco (estruturação), com sincronização bidirecional para o comercial via triggers.
+ * Regra: last-write-wins via atualizado_em.
  */
-export async function salvarCustos(payload: SalvarCustosPayload): Promise<{ success: boolean; error?: string; versao?: number }> {
+export async function salvarCustos(
+  payload: SalvarCustosPayload,
+): Promise<{ success: boolean; error?: string; versao?: number; id_custos_emissao?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('fluxo-1-salvar-custos', {
-      body: payload,
-    });
+    // upsert custos_emissao (1:1 por emissão)
+    const now = new Date().toISOString();
 
-    if (error) {
-      console.error('Erro ao salvar custos:', error);
-      return { success: false, error: error.message };
+    // buscar existente
+    const { data: existing, error: existingError } = await supabase
+      .from('custos_emissao')
+      .select('id, versao')
+      .eq('id_emissao', payload.id_emissao_comercial)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const idCustos = existing?.id ?? uuidv4();
+    const versao = (existing?.versao ?? 0) + 1;
+
+    const { data: custosRow, error: upsertError } = await supabase
+      .from('custos_emissao')
+      .upsert({
+        id: idCustos,
+        id_emissao: payload.id_emissao_comercial,
+        versao,
+        ...payload.totais,
+        atualizado_em: now,
+      } as any, { onConflict: 'id_emissao' } as any)
+      .select('id, versao')
+      .single();
+
+    if (upsertError) throw upsertError;
+
+    // substituir linhas (simples e previsível)
+    const { error: delError } = await supabase
+      .from('custos_linhas')
+      .delete()
+      .eq('id_custos_emissao', idCustos);
+
+    if (delError) throw delError;
+
+    if (payload.custos.length > 0) {
+      const rows = payload.custos.map((c) => ({
+        id: uuidv4(),
+        id_custos_emissao: idCustos,
+        ...c,
+        atualizado_em: now,
+      }));
+
+      const { error: insError } = await supabase
+        .from('custos_linhas')
+        .insert(rows as any);
+
+      if (insError) throw insError;
     }
 
-    return { success: true, versao: data?.versao };
-  } catch (err) {
+    return { success: true, versao: custosRow?.versao, id_custos_emissao: idCustos };
+  } catch (err: any) {
     console.error('Erro ao salvar custos:', err);
-    return { success: false, error: 'Erro inesperado ao salvar custos' };
+    return { success: false, error: err?.message || 'Erro inesperado ao salvar custos' };
   }
 }

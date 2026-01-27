@@ -122,6 +122,13 @@ export function SeriesTab({ idEmissao }: SeriesTabProps) {
 
   const handleAddSerie = () => {
     const nextNumero = series.length > 0 ? Math.max(...series.map((s) => s.numero)) + 1 : 1;
+
+    // Se ainda não estiver em modo edição (caso "Nenhuma série cadastrada"),
+    // entrar em edição para renderizar a linha nova.
+    if (!isEditing) {
+      setIsEditing(true);
+    }
+
     setNewSerie({
       numero: nextNumero,
       valor_emissao: 0,
@@ -304,7 +311,7 @@ export function SeriesTab({ idEmissao }: SeriesTabProps) {
   return (
     <div className="space-y-4">
       {/* Resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="bg-muted/30">
           <CardContent className="pt-4">
             <div className="text-xs text-muted-foreground">Total de Séries</div>
@@ -319,7 +326,7 @@ export function SeriesTab({ idEmissao }: SeriesTabProps) {
         </Card>
       </div>
 
-      {/* Tabela de Séries */}
+      {/* Detalhamento das Séries */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -366,23 +373,158 @@ export function SeriesTab({ idEmissao }: SeriesTabProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20">Série</TableHead>
-                <TableHead>Valor de Emissão</TableHead>
-                <TableHead>% do Volume</TableHead>
-                <TableHead>Taxa de Juros</TableHead>
-                <TableHead>Prazo (meses)</TableHead>
-                <TableHead>Vencimento</TableHead>
-                {isEditing && <TableHead className="w-12" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {series.map((serie) => renderSerieRow(serie))}
-              {newSerie && renderSerieRow({ id: 'new', id_emissao: idEmissao, ...newSerie } as SerieDB, true)}
-            </TableBody>
-          </Table>
+          {/* Mobile: cards */}
+          <div className="sm:hidden space-y-2">
+            {[...series, ...(newSerie ? [{ id: 'new', id_emissao: idEmissao, ...newSerie } as any] : [])].map((serie: any) => {
+              const isNew = serie.id === 'new';
+              const editState = isNew ? newSerie : editedSeries[serie.id];
+              const currentTotalVolume = isNew ? totalVolume + (newSerie?.valor_emissao || 0) : totalVolume;
+
+              if (isEditing && editState) {
+                return (
+                  <div key={serie.id} className="rounded-xl border border-border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <Badge variant="outline">Série {editState.numero}</Badge>
+                      <div className="flex items-center gap-1">
+                        {!isNew ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDeleteSerie(serie.id)}
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button size="icon" variant="ghost" onClick={() => setNewSerie(null)} className="h-8 w-8">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-2">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Valor de Emissão</div>
+                        <Input
+                          type="number"
+                          value={editState.valor_emissao || ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            if (isNew) updateNewSerie('valor_emissao', val);
+                            else updateEditedSerie(serie.id, 'valor_emissao', val);
+                          }}
+                          className="h-10"
+                        />
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          % do Volume: {currentTotalVolume > 0 ? `${((editState.valor_emissao / currentTotalVolume) * 100).toFixed(2)}%` : '-'}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Taxa de Juros</div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editState.taxa_juros ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value ? parseFloat(e.target.value) : null;
+                              if (isNew) updateNewSerie('taxa_juros', val);
+                              else updateEditedSerie(serie.id, 'taxa_juros', val);
+                            }}
+                            className="h-10"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-1">Prazo (meses)</div>
+                          <Input
+                            type="number"
+                            value={editState.prazo ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value) : null;
+                              if (isNew) updateNewSerie('prazo', val);
+                              else updateEditedSerie(serie.id, 'prazo', val);
+                            }}
+                            className="h-10"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Vencimento</div>
+                        <Input
+                          type="date"
+                          value={editState.data_vencimento ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value || null;
+                            if (isNew) updateNewSerie('data_vencimento', val);
+                            else updateEditedSerie(serie.id, 'data_vencimento', val);
+                          }}
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={serie.id} className="rounded-xl border border-border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <Badge variant="outline">Série {serie.numero}</Badge>
+                    {isEditing ? <div className="text-xs text-muted-foreground">em edição</div> : null}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-muted/40 p-2">
+                      <div className="text-[11px] text-muted-foreground">Valor</div>
+                      <div className="text-sm font-semibold tabular-nums">{formatCurrency(serie.valor_emissao || 0)}</div>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-2">
+                      <div className="text-[11px] text-muted-foreground">% do Volume</div>
+                      <div className="text-sm font-semibold tabular-nums">
+                        {serie.percentual_volume
+                          ? `${serie.percentual_volume.toFixed(2)}%`
+                          : totalVolume > 0
+                            ? `${(((serie.valor_emissao || 0) / totalVolume) * 100).toFixed(2)}%`
+                            : '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-2">
+                      <div className="text-[11px] text-muted-foreground">Taxa</div>
+                      <div className="text-sm font-semibold tabular-nums">{serie.taxa_juros ? `${serie.taxa_juros.toFixed(2)}% a.a.` : '-'}</div>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-2">
+                      <div className="text-[11px] text-muted-foreground">Vencimento</div>
+                      <div className="text-sm font-semibold tabular-nums">{serie.data_vencimento ? new Date(serie.data_vencimento).toLocaleDateString('pt-BR') : '-'}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-20">Série</TableHead>
+                  <TableHead>Valor de Emissão</TableHead>
+                  <TableHead>% do Volume</TableHead>
+                  <TableHead>Taxa de Juros</TableHead>
+                  <TableHead>Prazo (meses)</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  {isEditing && <TableHead className="w-12" />}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {series.map((serie) => renderSerieRow(serie))}
+                {newSerie && renderSerieRow({ id: 'new', id_emissao: idEmissao, ...newSerie } as SerieDB, true)}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

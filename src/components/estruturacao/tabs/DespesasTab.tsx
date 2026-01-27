@@ -184,7 +184,7 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
       const totalMensalCalc = costsData.mensal.reduce((s, i) => s + i.valorBruto, 0);
 
       const result = await salvarCustos({
-        id_emissao: idEmissao,
+        id_emissao_comercial: idEmissao,
         custos: allCosts,
         totais: {
           total_upfront: totalUpfrontCalc,
@@ -198,7 +198,11 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
       if (result.success) {
         toast.success(`Custos salvos com sucesso${result.versao ? ` (v${result.versao})` : ''}`);
         setHasChanges(false);
-        queryClient.invalidateQueries({ queryKey: ['custos-linhas', custos?.id] });
+        // linhas são sempre identificadas por id_custos_emissao
+        const idCustosEmissao = result.id_custos_emissao || custos?.id;
+        if (idCustosEmissao) {
+          queryClient.invalidateQueries({ queryKey: ['custos-linhas', idCustosEmissao] });
+        }
         queryClient.invalidateQueries({ queryKey: ['custos', idEmissao] });
       } else {
         toast.error(result.error || 'Erro ao salvar custos');

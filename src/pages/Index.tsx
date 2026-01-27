@@ -6,7 +6,30 @@ import { formatCurrency } from '@/utils/formatters';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Loader2, Building2, TrendingUp, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Search, Loader2, Building2, TrendingUp, FileText, ArrowUpRight } from 'lucide-react';
+
+const categoriaStyles: Record<string, string> = {
+  CRI: 'bg-emerald-600/10 text-emerald-700 border-emerald-600/25',
+  CRA: 'bg-teal-600/10 text-teal-700 border-teal-600/25',
+  DEB: 'bg-indigo-600/10 text-indigo-700 border-indigo-600/25',
+  CR: 'bg-lime-600/10 text-lime-700 border-lime-600/25',
+  NC: 'bg-amber-600/10 text-amber-700 border-amber-600/25',
+};
+
+function CategoriaPill({ code }: { code: string | null | undefined }) {
+  if (!code) return <span className="text-muted-foreground">-</span>;
+  const cls = categoriaStyles[code] ?? 'bg-muted text-foreground border-border';
+  return (
+    <Badge
+      variant="outline"
+      className={`rounded-full px-2.5 py-0.5 font-medium ${cls} shadow-[0_0_0_0_rgba(0,0,0,0)] transition-shadow group-hover:shadow-[0_0_0_6px_rgba(16,185,129,0.10)]`}
+    >
+      {code}
+    </Badge>
+  );
+}
 
 const Index = () => {
   const { data: operacoes, isLoading } = useOperacoesEstruturacao();
@@ -37,7 +60,7 @@ const Index = () => {
   // Stats
   const totalEmissoes = filteredOperacoes.length;
   const totalVolume = filteredOperacoes.reduce((acc, op) => acc + (op.volume || 0), 0);
-  const empresasUnicas = new Set(filteredOperacoes.map(op => op.categoria_nome).filter(Boolean)).size;
+  const categoriasUnicas = new Set(filteredOperacoes.map(op => op.categoria_nome).filter(Boolean)).size;
 
   if (isLoading) {
     return (
@@ -86,7 +109,7 @@ const Index = () => {
                 <Building2 className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Categorias</span>
               </div>
-              <div className="text-2xl font-bold">{empresasUnicas}</div>
+              <div className="text-2xl font-bold">{categoriasUnicas}</div>
             </CardContent>
           </Card>
         </div>
@@ -102,7 +125,7 @@ const Index = () => {
           />
         </div>
 
-        {/* Tabela de Operações */}
+        {/* Operações */}
         <Card>
           <CardContent className="p-0">
             {filteredOperacoes.length === 0 ? (
@@ -110,40 +133,90 @@ const Index = () => {
                 Nenhuma operação em estruturação encontrada.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>PMO</TableHead>
-                    <TableHead>Nº Emissão</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Operação</TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Mobile: cards (sem arrastar tabela) */}
+                <div className="sm:hidden p-3 space-y-3">
                   {filteredOperacoes.map((operacao) => (
-                    <TableRow
+                    <button
                       key={operacao.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      type="button"
                       onClick={() => handleRowClick(operacao)}
+                      className="w-full text-left rounded-lg border border-border/70 bg-background p-4 space-y-3 active:bg-muted/40"
                     >
-                      <TableCell className="font-medium">
-                        {operacao.pmo_nome || <span className="text-muted-foreground italic">Não atribuído</span>}
-                      </TableCell>
-                      <TableCell>{operacao.numero_emissao}</TableCell>
-                      <TableCell>
-                        {operacao.categoria_nome || <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell>
-                        {operacao.nome_operacao || <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(operacao.volume || 0)}
-                      </TableCell>
-                    </TableRow>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold truncate">
+                            {operacao.nome_operacao || 'Operação'}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {operacao.numero_emissao}
+                            {operacao.categoria_nome ? ` • ${operacao.categoria_nome}` : ''}
+                            {operacao.veiculo_nome ? ` • ${operacao.veiculo_nome}` : ''}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <CategoriaPill code={operacao.categoria_nome} />
+                            {operacao.veiculo_nome ? (
+                              <Badge variant="secondary" className="rounded-full">
+                                {operacao.veiculo_nome}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-sm font-semibold tabular-nums">
+                          {formatCurrency(operacao.volume || 0)}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs text-muted-foreground truncate">
+                          PMO: {operacao.pmo_nome || 'Não atribuído'}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleRowClick(operacao); }}>
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </button>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Desktop: tabela */}
+                <div className="hidden sm:block overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>PMO</TableHead>
+                        <TableHead>Nº Emissão</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Operação</TableHead>
+                        <TableHead className="text-right">Volume</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredOperacoes.map((operacao) => (
+                        <TableRow
+                          key={operacao.id}
+                          className="group cursor-pointer transition-colors hover:bg-muted/50"
+                          onClick={() => handleRowClick(operacao)}
+                        >
+                          <TableCell className="font-medium group-hover:bg-primary/5 transition-colors">
+                            {operacao.pmo_nome || <span className="text-muted-foreground italic">Não atribuído</span>}
+                          </TableCell>
+                          <TableCell className="group-hover:bg-primary/5 transition-colors">{operacao.numero_emissao}</TableCell>
+                          <TableCell className="group-hover:bg-primary/5 transition-colors">
+                            <CategoriaPill code={operacao.categoria_nome} />
+                          </TableCell>
+                          <TableCell className="group-hover:bg-primary/5 transition-colors">
+                            {operacao.nome_operacao || <span className="text-muted-foreground">-</span>}
+                          </TableCell>
+                          <TableCell className="text-right font-medium group-hover:bg-primary/5 transition-colors">
+                            {formatCurrency(operacao.volume || 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

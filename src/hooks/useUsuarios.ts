@@ -9,12 +9,22 @@ export function useUsuarios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome_completo');
-      
+        .select('*');
+
       if (error) throw error;
-      return data as Usuario[];
+
+      // Compat: remoto usa nome_completo; local usa nome
+      const normalized = (data || []).map((u: any) => ({
+        id: u.id,
+        nome_completo: u.nome_completo || u.nome || u.email || '—',
+        email: u.email || '',
+        funcao: u.funcao ?? null,
+        departamento: u.departamento ?? null,
+        ativo: u.ativo ?? true,
+      })) as Usuario[];
+
+      normalized.sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || '', 'pt-BR'));
+      return normalized;
     },
   });
 }
@@ -26,13 +36,22 @@ export function useUsuariosPMO() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome_completo');
-      
+        .select('*');
+
       if (error) throw error;
+
       // Por enquanto, todos os usuários podem ser PMO
-      return data as Usuario[];
+      const normalized = (data || []).map((u: any) => ({
+        id: u.id,
+        nome_completo: u.nome_completo || u.nome || u.email || '—',
+        email: u.email || '',
+        funcao: u.funcao ?? null,
+        departamento: u.departamento ?? null,
+        ativo: u.ativo ?? true,
+      })) as Usuario[];
+
+      normalized.sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || '', 'pt-BR'));
+      return normalized;
     },
   });
 }
