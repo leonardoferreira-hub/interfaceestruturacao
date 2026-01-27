@@ -345,8 +345,29 @@ export function HistoricoAlteracoesTab({ idEmissao }: { idEmissao: string }) {
         // Mostrar apenas ALTERAÇÕES (update) — deletions também geram ruído.
         if (r.action !== 'UPDATE') return false;
 
-        // Não poluir com updates que não trazem diff útil
-        return diffFields(r.old_data, r.new_data).length > 0;
+        const changes = diffFields(r.old_data, r.new_data);
+        if (changes.length === 0) return false;
+
+        // Custos: focar no que importa (valores/aliquota/periodicidade),
+        // ignorando ruído do tipo_preco e alterações técnicas.
+        const table = r.table_name?.toLowerCase?.() ?? '';
+        if (table === 'custos_linhas') {
+          const allowed = new Set([
+            'papel',
+            'id_prestador',
+            'periodicidade',
+            'preco_upfront',
+            'preco_recorrente',
+            'gross_up',
+            'valor_upfront_bruto',
+            'valor_recorrente_bruto',
+          ]);
+
+          const meaningful = changes.filter((c) => allowed.has(c.key));
+          return meaningful.length > 0;
+        }
+
+        return true;
       })
       .filter((r) => {
         // Só após a criação da emissão (evita "setup inicial")

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, AlertCircle, Save, Loader2 } from 'lucide-react';
+import { TrendingUp, AlertCircle, Save, Loader2, Download } from 'lucide-react';
 import { CostSection, type CostType } from './despesas/CostSection';
 import type { CostItem } from './despesas/CostRow';
 import { useCustosEmissao, useCustosLinhas } from '@/hooks/useCustos';
@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { convertToApiFormat, salvarCustos } from '@/lib/supabase-custos';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { exportDespesasLayoutToExcel } from '@/lib/excel-despesas';
+import { useQuery } from '@tanstack/react-query';
 
 interface DespesasTabProps {
   idEmissao: string;
@@ -27,6 +29,20 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
   const { data: custos, isLoading: isLoadingCustos } = useCustosEmissao(idEmissao);
   const { data: custosLinhas, isLoading: isLoadingLinhas } = useCustosLinhas(custos?.id);
   const { data: series = [] } = useSeries(idEmissao);
+
+  const { data: emissaoMeta } = useQuery({
+    queryKey: ['emissao-meta', idEmissao],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('emissoes')
+        .select('numero_emissao')
+        .eq('id', idEmissao)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { numero_emissao: string } | null;
+    },
+    enabled: !!idEmissao,
+  });
 
   const [costsData, setCostsData] = useState<CostsData>({
     upfront: [],
@@ -169,6 +185,23 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
     setHasChanges(true);
   };
 
+  const handleExport = async () => {
+    try {
+      const numero = emissaoMeta?.numero_emissao || 'emissao';
+      exportDespesasLayoutToExcel({
+        numeroEmissao: numero,
+        volumeEmissao: volume,
+        upfront: costsData.upfront,
+        anual: costsData.anual,
+        mensal: costsData.mensal,
+      });
+      toast.success('Excel de despesas gerado');
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Falha ao exportar despesas');
+    }
+  };
+
   const handleSaveAll = async () => {
     setIsSaving(true);
     
@@ -301,29 +334,40 @@ export function DespesasTab({ idEmissao }: DespesasTabProps) {
         </CardContent>
       </Card>
 
-      {/* Botão de Salvar */}
-      {hasChanges && (
-        <div className="flex justify-end">
-          <Button
-            onClick={handleSaveAll}
-            disabled={isSaving}
-            size="lg"
-            className="gap-2"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Salvar Alterações
-              </>
-            )}
-          </Button>
-        </div>
-      )}
+      {/* Ações */}
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+        <Button variant="outline" onClick={handleExport} className="gap-2 w-full sm:w-auto">
+          <Download className="h-4 w-4" />
+          Exportar despesas (Excel)
+        </Button>
+
+        {hasChanges ? (
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveAll}
+              disabled={isSaving}
+              size="lg"
+              className="gap-2 w-full sm:w-auto"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Salvar Alterações
+                </>
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground sm:text-right">
+            Sem alterações pendentes
+          </div>
+        )}
+      </div>
     </div>
   );
 }
