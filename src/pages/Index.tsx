@@ -4,11 +4,11 @@ import { EmissaoEstruturacaoDrawer } from '@/components/estruturacao/EmissaoEstr
 import { useOperacoesEstruturacao, OperacaoEstruturacao } from '@/hooks/useOperacoesEstruturacao';
 import { formatCurrency } from '@/utils/formatters';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Building2, TrendingUp, FileText, ArrowUpRight } from 'lucide-react';
+import { Search, Loader2, Building2, TrendingUp, FileText, ArrowUpRight, RefreshCcw } from 'lucide-react';
 
 const categoriaStyles: Record<string, string> = {
   CRI: 'bg-emerald-600/10 text-emerald-700 border-emerald-600/25',
@@ -78,58 +78,87 @@ const Index = () => {
       <Navigation />
       
       <main className="container py-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Emissões em Estruturação</h1>
-          <p className="text-muted-foreground">Gerencie as operações em estruturação</p>
+        {/* Header (estilo shadcn dashboard) */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Emissões em Estruturação</h1>
+            <p className="text-muted-foreground">KPIs, busca e acompanhamento do pipeline</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="gap-2"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Atualizar
+            </Button>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Emissões</span>
-              </div>
-              <div className="text-2xl font-bold">{totalEmissoes}</div>
+        {/* Stats (cards mais "fintech") */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Emissões</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{totalEmissoes}</div>
+              <p className="text-xs text-muted-foreground">no recorte atual (filtro/busca)</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Volume Total</span>
-              </div>
-              <div className="text-2xl font-bold">{formatCurrency(totalVolume)}</div>
+
+          <Card className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Volume Total</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{formatCurrency(totalVolume)}</div>
+              <p className="text-xs text-muted-foreground">soma das operações listadas</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Categorias</span>
-              </div>
-              <div className="text-2xl font-bold">{categoriasUnicas}</div>
+
+          <Card className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Categorias</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tabular-nums">{categoriasUnicas}</div>
+              <p className="text-xs text-muted-foreground">diversidade do pipeline</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por código, operação, categoria ou PMO..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {/* Operações */}
+        {/* Table Card (toolbar + search) */}
         <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-base">Operações</CardTitle>
+                <CardDescription>
+                  Clique numa linha para abrir o painel com Visão Geral, Séries, Despesas, Documentos e Histórico.
+                </CardDescription>
+              </div>
+
+              <div className="relative w-full sm:w-[360px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por código, operação, categoria ou PMO..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          </CardHeader>
+
           <CardContent className="p-0">
             {filteredOperacoes.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
+              <div className="py-10 text-center text-muted-foreground">
                 Nenhuma operação em estruturação encontrada.
               </div>
             ) : (
@@ -141,7 +170,7 @@ const Index = () => {
                       key={operacao.id}
                       type="button"
                       onClick={() => handleRowClick(operacao)}
-                      className="w-full text-left rounded-lg border border-border/70 bg-background p-4 space-y-3 active:bg-muted/40"
+                      className="group w-full text-left rounded-lg border border-border/70 bg-background p-4 space-y-3 active:bg-muted/40"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
