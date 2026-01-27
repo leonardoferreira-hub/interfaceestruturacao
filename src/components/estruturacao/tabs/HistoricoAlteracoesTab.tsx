@@ -325,7 +325,11 @@ export function HistoricoAlteracoesTab({ idEmissao }: { idEmissao: string }) {
         return false;
       })
       .filter((r) => {
-        // Não poluir o histórico com updates que não trazem diff útil
+        // Mostrar apenas ALTERAÇÕES: update/delete.
+        // (a criação inicial de registros gera muito ruído.)
+        if (r.action === 'INSERT') return false;
+
+        // Não poluir com updates que não trazem diff útil
         if (r.action !== 'UPDATE') return true;
         return diffFields(r.old_data, r.new_data).length > 0;
       });
