@@ -14,6 +14,8 @@ function uuidv4() {
 
 
 interface CustoLinha {
+  /** Mantém id estável para permitir upsert sem apagar tudo */
+  id?: string;
   papel: string;
   id_prestador: string | null;
   tipo_preco: string;
@@ -45,6 +47,7 @@ interface SalvarCustosPayload {
  */
 export function convertToApiFormat(items: CostItem[], type: CostType): CustoLinha[] {
   return items.map((item) => ({
+    id: item.id,
     papel: item.papel || item.prestador,
     id_prestador: item.id_prestador || null,
     tipo_preco: item.tipo === 'input' ? 'fixo' : 'auto',
@@ -94,27 +97,59 @@ export async function salvarCustos(
 
     if (upsertError) throw upsertError;
 
-    // substituir linhas (simples e previsível)
-    const { error: delError } = await supabase
+    // Atualizar linhas sem risco de perder tudo se o insert falhar.
+    // Estratégia: upsert primeiro, depois apagar o que foi removido.
+
+    // buscar ids atuais (pra conseguir deletar só o que saiu)
+    const { data: existingLinhas, error: existingLinhasError } = await supabase
       .from('custos_linhas')
-      .delete()
+      .select('id')
       .eq('id_custos_emissao', idCustos);
 
-    if (delError) throw delError;
+    if (existingLinhasError) throw existingLinhasError;
 
-    if (payload.custos.length > 0) {
-      const rows = payload.custos.map((c) => ({
-        id: uuidv4(),
+    const existingIds = new Set((existingLinhas ?? []).map((r: any) => r.id));
+
+    const desiredRows = (payload.custos ?? []).map((c) => {
+      const id = c.id && existingIds.has(c.id) ? c.id : uuidv4();
+      return {
+        id,
         id_custos_emissao: idCustos,
         ...c,
         atualizado_em: now,
-      }));
+      };
+    });
 
-      const { error: insError } = await supabase
+    const desiredIds = new Set(desiredRows.map((r) => r.id));
+
+    if (desiredRows.length > 0) {
+      const { error: upsertLinhasError } = await supabase
         .from('custos_linhas')
-        .insert(rows as any);
+        .upsert(desiredRows as any, { onConflict: 'id' } as any);
 
-      if (insError) throw insError;
+      if (upsertLinhasError) throw upsertLinhasError;
+    }
+
+    // Agora sim: apagar o que não está mais na UI
+    // - se o usuário removeu tudo, apagar tudo
+    if (desiredIds.size === 0) {
+      const { error: delAllError } = await supabase
+        .from('custos_linhas')
+        .delete()
+        .eq('id_custos_emissao', idCustos);
+
+      if (delAllError) throw delAllError;
+    } else {
+      const idsToDelete = Array.from(existingIds).filter((id) => !desiredIds.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: delSomeError } = await supabase
+          .from('custos_linhas')
+          .delete()
+          .eq('id_custos_emissao', idCustos)
+          .in('id', idsToDelete);
+
+        if (delSomeError) throw delSomeError;
+      }
     }
 
     return { success: true, versao: custosRow?.versao, id_custos_emissao: idCustos };
