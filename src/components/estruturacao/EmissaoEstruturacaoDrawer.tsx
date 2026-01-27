@@ -63,7 +63,12 @@ export function EmissaoEstruturacaoDrawer({
                 className="flex items-center gap-2 mt-1 text-sm text-muted-foreground"
               >
                 <Building2 className="h-4 w-4" />
-                <span>{emissao.empresa_razao_social || 'Empresa não informada'}</span>
+                <span>
+                  {emissao.empresa_razao_social ||
+                    (emissao as any).empresa_destinataria ||
+                    (emissao as any).empresa_nome_fantasia ||
+                    'Empresa não informada'}
+                </span>
               </motion.div>
             </div>
             <motion.div
