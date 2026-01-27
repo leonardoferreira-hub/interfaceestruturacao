@@ -130,8 +130,8 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
 
     const custos = (data?.data?.custos || []) as any[];
 
-    // converter para custos_linhas
-    const linhas = custos.flatMap((c) => {
+    // converter para custos_linhas (recalculados)
+    const linhasRecalc = custos.flatMap((c) => {
       const upfront = Number(c.valor_upfront_calculado ?? c.preco_upfront ?? 0) || 0;
       const recorr = Number(c.valor_recorrente_calculado ?? c.preco_recorrente ?? 0) || 0;
       const tipo_preco = c.tipo_preco === 'percentual' ? 'percentual' : 'fixo';
@@ -167,9 +167,50 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
       return items;
     });
 
-    const total_upfront = linhas.reduce((s, l) => s + (l.valor_upfront_bruto || 0), 0);
-    const mensal = linhas.filter((l) => l.periodicidade === 'mensal');
-    const anual = linhas.filter((l) => l.periodicidade === 'anual');
+    // IMPORTANTE: não apagar custos que já estavam preenchidos manualmente.
+    // Estratégia: preserva linhas existentes que não forem recalculadas e tenta reaproveitar IDs.
+    const { data: custosEmissaoRow, error: custosEmissaoErr } = await supabase
+      .from('custos_emissao')
+      .select('id')
+      .eq('id_emissao', emissaoComercialId)
+      .maybeSingle();
+    if (custosEmissaoErr) throw custosEmissaoErr;
+
+    const { data: existingLinhas, error: existingLinhasErr } = await supabase
+      .from('custos_linhas')
+      .select('*')
+      .eq('id_custos_emissao', custosEmissaoRow?.id || '__none__');
+    if (existingLinhasErr) throw existingLinhasErr;
+
+    const keyOf = (l: any) => `${l.papel}::${l.periodicidade ?? 'upfront'}`;
+    const existingByKey = new Map((existingLinhas || []).map((l: any) => [keyOf(l), l]));
+    const recalcKeys = new Set(linhasRecalc.map((l) => keyOf(l)));
+
+    const linhasPreservadas = (existingLinhas || [])
+      .filter((l: any) => !recalcKeys.has(keyOf(l)))
+      .map((l: any) => ({
+        id: l.id,
+        papel: l.papel,
+        id_prestador: l.id_prestador ?? null,
+        tipo_preco: l.tipo_preco,
+        preco_upfront: l.preco_upfront || 0,
+        preco_recorrente: l.preco_recorrente || 0,
+        periodicidade: l.periodicidade ?? null,
+        gross_up: l.gross_up || 0,
+        valor_upfront_bruto: l.valor_upfront_bruto || 0,
+        valor_recorrente_bruto: l.valor_recorrente_bruto || 0,
+      }));
+
+    const linhas = [...linhasRecalc].map((l) => {
+      const existing = existingByKey.get(keyOf(l));
+      return existing ? { ...l, id: existing.id } : l;
+    });
+
+    const merged = [...linhas, ...linhasPreservadas];
+
+    const total_upfront = merged.reduce((s, l) => s + (l.valor_upfront_bruto || 0), 0);
+    const mensal = merged.filter((l) => l.periodicidade === 'mensal');
+    const anual = merged.filter((l) => l.periodicidade === 'anual');
     const total_mensal = mensal.reduce((s, l) => s + (l.valor_recorrente_bruto || 0), 0);
     const total_anual = anual.reduce((s, l) => s + (l.valor_recorrente_bruto || 0), 0);
 
@@ -183,7 +224,7 @@ export function InformacoesTab({ emissao }: InformacoesTabProps) {
 
     const res = await salvarCustos({
       id_emissao_comercial: emissaoComercialId,
-      custos: linhas,
+      custos: merged,
       totais,
     });
 
