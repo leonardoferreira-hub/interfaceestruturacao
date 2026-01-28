@@ -21,7 +21,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useOperacoesCompliance, type ComplianceResumo } from '@/hooks/useCompliance';
-import { EmissaoEstruturacaoDrawer } from '@/components/estruturacao/EmissaoEstruturacaoDrawer';
+import { ComplianceDrawer } from '@/components/estruturacao/ComplianceDrawer';
+import { Navigation } from '@/components/layout/Navigation';
 import { formatCurrency } from '@/utils/formatters';
 
 const statusConfig = {
@@ -62,17 +63,19 @@ export default function CompliancePage() {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <ShieldCheck className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl font-bold">Compliance</h1>
+    <div className="min-h-screen">
+      <Navigation />
+      <div className="container mx-auto py-6 px-4">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <ShieldCheck className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-bold">Compliance</h1>
+          </div>
+          <p className="text-muted-foreground">
+            Gerenciamento de verificações de CNPJ das operações
+          </p>
         </div>
-        <p className="text-muted-foreground">
-          Gerenciamento de verificações de CNPJ das operações
-        </p>
-      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -201,20 +204,17 @@ export default function CompliancePage() {
         </CardContent>
       </Card>
 
-      {/* Drawer */}
-      {selectedOperacao && (
-        <EmissaoEstruturacaoDrawer
-          emissao={{
-            id: selectedOperacao.operacao_id,
-            numero_emissao: selectedOperacao.numero_emissao,
-            nome_operacao: selectedOperacao.nome_operacao,
-            status: selectedOperacao.operacao_status,
-          } as any}
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          initialTab="compliance"
-        />
-      )}
+        {/* Drawer */}
+        {selectedOperacao && (
+          <ComplianceDrawer
+            operacaoId={selectedOperacao.operacao_id}
+            numeroEmissao={selectedOperacao.numero_emissao}
+            nomeOperacao={selectedOperacao.nome_operacao}
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+          />
+        )}
+      </div>
     </div>
   );
 }
