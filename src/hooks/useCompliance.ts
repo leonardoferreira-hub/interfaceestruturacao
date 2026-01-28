@@ -171,3 +171,40 @@ export function useOperacaoComplianceCompleto(operacaoId: string | undefined) {
     enabled: !!operacaoId,
   });
 }
+
+// Verificar status de um CNPJ no compliance externo
+export function useCNPJStatusCompliance(cnpj: string | undefined) {
+  return useQuery({
+    queryKey: ['cnpj-status-compliance', cnpj],
+    queryFn: async () => {
+      if (!cnpj) return null;
+      
+      // Buscar na base histórica
+      const { data: historico, error: err1 } = await supabase
+        .schema('compliance')
+        .from('cnpjs_verificados')
+        .select('*')
+        .eq('cnpj', cnpj.replace(/\D/g, ''))
+        .maybeSingle();
+      
+      if (err1) throw err1;
+      if (historico) return { source: 'historico', ...historico };
+      
+      // Buscar em verificações pendentes
+      const { data: pendente, error: err2 } = await supabase
+        .schema('compliance')
+        .from('verificacoes_pendentes')
+        .select('*')
+        .eq('cnpj', cnpj.replace(/\D/g, ''))
+        .in('status', ['pendente', 'em_analise'])
+        .order('data_solicitacao', { ascending: false })
+        .maybeSingle();
+      
+      if (err2) throw err2;
+      if (pendente) return { source: 'pendente', ...pendente };
+      
+      return null;
+    },
+    enabled: !!cnpj,
+  });
+}

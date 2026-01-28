@@ -14,6 +14,7 @@ import {
   useCreateComplianceCheck,
   useDeleteComplianceCheck,
   useOperacaoComplianceCompleto,
+  useCNPJStatusCompliance,
 } from '@/hooks/useCompliance';
 import { useConsultaCNPJ } from '@/hooks/useConsultaCNPJ';
 import { toast } from 'sonner';
@@ -226,47 +227,9 @@ export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabP
           </Card>
         ) : (
           <div className="space-y-3">
-            {checks?.map((check) => {
-              const status = statusConfig[check.status];
-              const StatusIcon = status.icon;
-
-              return (
-                <Card key={check.id} className={check.status === 'reprovado' ? 'border-red-200' : ''}>
-                  <CardContent className="py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">{formatarCNPJ(check.cnpj)}</span>
-                          <Badge className={status.color} variant="outline">
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-0.5">
-                          <p>Tipo: {tipoEntidadeOptions.find((t) => t.value === check.tipo_entidade)?.label}</p>
-                          {check.nome_entidade && <p className="font-medium text-foreground">{check.nome_entidade}</p>}
-                          {check.observacoes && (
-                            <p className="text-red-600 bg-red-50 p-2 rounded mt-2">
-                              <strong>Justificativa do Compliance:</strong> {check.observacoes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemover(check.id)}
-                        title="Remover CNPJ"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {checks?.map((check) => (
+              <CNPJCard key={check.id} check={check} onRemover={handleRemover} />
+            ))}
           </div>
         )}
       </div>
@@ -337,5 +300,65 @@ export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabP
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Componente para mostrar CNPJ com status do Compliance externo
+function CNPJCard({ check, onRemover }: { check: any; onRemover: (id: string) => void }) {
+  const { data: complianceExterno } = useCNPJStatusCompliance(check.cnpj);
+  const status = statusConfig[check.status];
+  const StatusIcon = status.icon;
+
+  // Status do compliance externo
+  const externoConfig: Record<string, { label: string; color: string }> = {
+    historico: { label: '✓ Verificado', color: 'text-green-600' },
+    pendente: { label: '⏳ No Compliance', color: 'text-amber-600' },
+  };
+
+  return (
+    <Card className={check.status === 'reprovado' ? 'border-red-200' : ''}>
+      <CardContent className="py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="font-medium">{formatarCNPJ(check.cnpj)}</span>
+              <Badge className={status.color} variant="outline">
+                <StatusIcon className="h-3 w-3 mr-1" />
+                {status.label}
+              </Badge>
+              {complianceExterno && (
+                <span className={`text-xs ${externoConfig[complianceExterno.source]?.color || 'text-muted-foreground'}`}>
+                  {externoConfig[complianceExterno.source]?.label}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <p>Tipo: {tipoEntidadeOptions.find((t) => t.value === check.tipo_entidade)?.label}</p>
+              {check.nome_entidade && <p className="font-medium text-foreground">{check.nome_entidade}</p>}
+              {complianceExterno?.observacoes && (
+                <p className="text-red-600 bg-red-50 p-2 rounded mt-2">
+                  <strong>Observação do Compliance:</strong> {complianceExterno.observacoes}
+                </p>
+              )}
+              {check.observacoes && (
+                <p className="text-amber-600 bg-amber-50 p-2 rounded mt-2">
+                  <strong>Observação Local:</strong> {check.observacoes}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => onRemover(check.id)}
+            title="Remover CNPJ"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
