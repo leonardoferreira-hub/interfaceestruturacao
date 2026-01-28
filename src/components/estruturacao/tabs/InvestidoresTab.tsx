@@ -6,7 +6,8 @@ import {
   Plus, 
   Loader2,
   User,
-  Building
+  Building,
+  FileText
 } from 'lucide-react';
 import { useSeries } from '@/hooks/useEmissoes';
 import { useAlocacoesPorEmissao } from '@/hooks/useInvestidores';
@@ -17,6 +18,7 @@ import {
 } from '@/types/estruturacao';
 import { formatCurrency } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
+import { InvestidorDocumentos } from '../InvestidorDocumentos';
 
 interface InvestidoresTabProps {
   idEmissao: string;
@@ -99,41 +101,57 @@ export function InvestidoresTab({ idEmissao }: InvestidoresTabProps) {
                     Nenhum investidor alocado nesta série.
                   </p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {serieAlocacoes.map((alocacao) => (
-                      <div 
-                        key={alocacao.id} 
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-muted rounded-full">
-                            {alocacao.investidor?.tipo_investidor === 'varejo' ? (
-                              <User className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Building className="h-4 w-4 text-muted-foreground" />
-                            )}
+                      <Card key={alocacao.id} className="bg-muted/30">
+                        <CardContent className="py-4">
+                          {/* Cabeçalho do Investidor */}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-background rounded-full">
+                                {alocacao.investidor?.tipo_investidor === 'varejo' ? (
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <Building className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium">
+                                  {alocacao.investidor?.nome || 'Investidor'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {alocacao.investidor?.tipo_investidor && 
+                                    TIPO_INVESTIDOR_LABELS[alocacao.investidor.tipo_investidor]
+                                  }
+                                  {alocacao.investidor?.cpf_cnpj && (
+                                    <span className="ml-2 text-xs">
+                                      CPF/CNPJ: {alocacao.investidor.cpf_cnpj}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">{formatCurrency(alocacao.valor_alocado)}</p>
+                              <Badge 
+                                variant="outline" 
+                                className={cn('text-xs', STATUS_ALOCACAO_COLORS[alocacao.status])}
+                              >
+                                {STATUS_ALOCACAO_LABELS[alocacao.status]}
+                              </Badge>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">
-                              {alocacao.investidor?.nome || 'Investidor'}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {alocacao.investidor?.tipo_investidor && 
-                                TIPO_INVESTIDOR_LABELS[alocacao.investidor.tipo_investidor]
-                              }
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatCurrency(alocacao.valor_alocado)}</p>
-                          <Badge 
-                            variant="outline" 
-                            className={cn('text-xs', STATUS_ALOCACAO_COLORS[alocacao.status])}
-                          >
-                            {STATUS_ALOCACAO_LABELS[alocacao.status]}
-                          </Badge>
-                        </div>
-                      </div>
+
+                          {/* Documentos do Investidor */}
+                          {alocacao.investidor?.id && (
+                            <div className="border-t pt-4 mt-4">
+                              <InvestidorDocumentos 
+                                idInvestidor={alocacao.investidor.id}
+                              />
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
                 )}

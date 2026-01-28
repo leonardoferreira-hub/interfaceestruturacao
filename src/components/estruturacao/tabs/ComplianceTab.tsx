@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, CheckCircle, Clock, XCircle, Plus, Trash2, Building2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, XCircle, Plus, Trash2, Building2, Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -16,12 +17,13 @@ import {
   useDeleteComplianceCheck,
   useOperacaoComplianceCompleto,
 } from '@/hooks/useCompliance';
+import { useConsultaCNPJ } from '@/hooks/useConsultaCNPJ';
 import { toast } from 'sonner';
 
 interface ComplianceTabProps {
   operacaoId: string;
   emissaoComercialId?: string;
-  isComplianceUser?: boolean; // TODO: verificar permissão real do usuário
+  isComplianceUser?: boolean;
 }
 
 const statusConfig = {
@@ -45,6 +47,7 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
   const createCheck = useCreateComplianceCheck();
   const updateStatus = useUpdateComplianceStatus();
   const deleteCheck = useDeleteComplianceCheck();
+  const { consultar, isLoading: isConsultando, data: cnpjData } = useConsultaCNPJ();
 
   // Buscar CNPJ principal da emissão (do Comercial)
   const { data: emissaoMeta } = useQuery({
@@ -65,13 +68,29 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
   const [novoCnpj, setNovoCnpj] = useState('');
   const [novoTipo, setNovoTipo] = useState('outro');
   const [novoNome, setNovoNome] = useState('');
+  const [justificativaRecusa, setJustificativaRecusa] = useState('');
+  const [checkSelecionado, setCheckSelecionado] = useState<string | null>(null);
+
+  // Consultar CNPJ automaticamente quando o usuário termina de digitar
+  useEffect(() => {
+    const cnpjLimpo = novoCnpj.replace(/\D/g, '');
+    if (cnpjLimpo.length === 14) {
+      const timer = setTimeout(() => {
+        consultar(cnpjLimpo).then((data) => {
+          if (data?.razao_social) {
+            setNovoNome(data.razao_social);
+          }
+        });
+      }, 500); // Debounce de 500ms
+      return () => clearTimeout(timer);
+    }
+  }, [novoCnpj, consultar]);
 
   const handleAdicionarCnpj = async () => {
     if (!novoCnpj.trim()) {
       toast.error('Informe o CNPJ');
       return;
     }
-    // Validação básica de CNPJ (14 dígitos)
     const cnpjLimpo = novoCnpj.replace(/\D/g, '');
     if (cnpjLimpo.length !== 14) {
       toast.error('CNPJ inválido (deve ter 14 dígitos)');
@@ -83,7 +102,7 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
         operacao_id: operacaoId,
         cnpj: cnpjLimpo,
         tipo_entidade: novoTipo,
-        nome_entidade: novoNome.trim() || null,
+        nome_entidade: novoNome.trim() || cnpjData?.razao_social || null,
       });
       toast.success('CNPJ adicionado para compliance');
       setNovoCnpj('');
@@ -95,13 +114,23 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
   };
 
   const handleAlterarStatus = async (checkId: string, novoStatus: string) => {
+    // Se for reprovar, precisa de justificativa
+    if (novoStatus === 'reprovado' && checkId !== checkSelecionado) {
+      setCheckSelecionado(checkId);
+      setJustificativaRecusa('');
+      return;
+    }
+
     try {
       await updateStatus.mutateAsync({
         id: checkId,
         operacao_id: operacaoId,
         status: novoStatus as any,
+        observacoes: novoStatus === 'reprovado' ? justificativaRecusa : undefined,
       });
       toast.success('Status atualizado');
+      setCheckSelecionado(null);
+      setJustificativaRecusa('');
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao atualizar status');
     }
@@ -115,6 +144,10 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao remover');
     }
+  };
+
+  const formatarCNPJ = (cnpj: string) => {
+    return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
   };
 
   if (isLoading) {
@@ -148,14 +181,12 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
               : 'Existem CNPJs pendentes de verificação.'}
           </p>
           <div className="mt-3 flex gap-2 text-xs">
-            <Badge variant="outline">
-              {checks?.length || 0} total
-            </Badge>
+            <Badge variant="outline">{checks?.length || 0} total</Badge>
             <Badge variant="outline" className="text-green-600">
-              {checks?.filter(c => c.status === 'aprovado').length || 0} aprovados
+              {checks?.filter((c) => c.status === 'aprovado').length || 0} aprovados
             </Badge>
             <Badge variant="outline" className="text-amber-600">
-              {checks?.filter(c => c.status === 'pendente').length || 0} pendentes
+              {checks?.filter((c) => c.status === 'pendente').length || 0} pendentes
             </Badge>
           </div>
         </CardContent>
@@ -178,9 +209,10 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
                   <p className="text-sm text-muted-foreground">{emissaoMeta.empresa_razao_social}</p>
                 )}
               </div>
-              {/* Verificar se já existe check para este CNPJ */}
-              {checks?.some(c => c.cnpj === emissaoMeta.empresa_cnpj) ? (
-                <Badge variant="outline" className="text-green-600">Já adicionado</Badge>
+              {checks?.some((c) => c.cnpj === emissaoMeta.empresa_cnpj) ? (
+                <Badge variant="outline" className="text-green-600">
+                  Já adicionado
+                </Badge>
               ) : (
                 <Button
                   size="sm"
@@ -204,7 +236,7 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
       {/* Lista de CNPJs para Compliance */}
       <div className="space-y-4">
         <h3 className="text-sm font-medium">CNPJs em Verificação</h3>
-        
+
         {checks?.length === 0 ? (
           <Card className="bg-muted/50">
             <CardContent className="py-6 text-center text-sm text-muted-foreground">
@@ -218,47 +250,47 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
             {checks?.map((check) => {
               const status = statusConfig[check.status];
               const StatusIcon = status.icon;
-              
+              const isReprovando = checkSelecionado === check.id;
+
               return (
                 <Card key={check.id} className={check.status === 'reprovado' ? 'border-red-200' : ''}>
                   <CardContent className="py-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">{check.cnpj}</span>
+                          <span className="font-medium">{formatarCNPJ(check.cnpj)}</span>
                           <Badge className={status.color} variant="outline">
                             <StatusIcon className="h-3 w-3 mr-1" />
                             {status.label}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground space-y-0.5">
-                          <p>Tipo: {tipoEntidadeOptions.find(t => t.value === check.tipo_entidade)?.label}</p>
-                          {check.nome_entidade && <p>{check.nome_entidade}</p>}
+                          <p>Tipo: {tipoEntidadeOptions.find((t) => t.value === check.tipo_entidade)?.label}</p>
+                          {check.nome_entidade && <p className="font-medium text-foreground">{check.nome_entidade}</p>}
                           {check.observacoes && (
-                            <p className="text-amber-600">Obs: {check.observacoes}</p>
+                            <p className="text-red-600 bg-red-50 p-2 rounded mt-2">
+                              <strong>Justificativa:</strong> {check.observacoes}
+                            </p>
                           )}
                         </div>
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {/* Ações de Compliance */}
-                        {isComplianceUser && (
-                          <Select
-                            value={check.status}
-                            onValueChange={(v) => handleAlterarStatus(check.id, v)}
-                          >
-                            <SelectTrigger className="w-36 h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendente">Pendente</SelectItem>
-                              <SelectItem value="em_analise">Em Análise</SelectItem>
-                              <SelectItem value="aprovado">Aprovado</SelectItem>
-                              <SelectItem value="reprovado">Reprovado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                        
+
+                      <div className="flex flex-col items-end gap-2">
+                        <Select
+                          value={check.status}
+                          onValueChange={(v) => handleAlterarStatus(check.id, v)}
+                        >
+                          <SelectTrigger className="w-36 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="em_analise">Em Análise</SelectItem>
+                            <SelectItem value="aprovado">Aprovado</SelectItem>
+                            <SelectItem value="reprovado">Reprovado</SelectItem>
+                          </SelectContent>
+                        </Select>
+
                         <Button
                           size="icon"
                           variant="ghost"
@@ -269,6 +301,42 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
                         </Button>
                       </div>
                     </div>
+
+                    {/* Campo de justificativa para recusa */}
+                    {isReprovando && (
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <Label htmlFor={`justificativa-${check.id}`} className="text-red-700 text-xs font-medium">
+                          Justificativa da Recusa (obrigatório)
+                        </Label>
+                        <Textarea
+                          id={`justificativa-${check.id}`}
+                          placeholder="Informe o motivo da recusa..."
+                          value={justificativaRecusa}
+                          onChange={(e) => setJustificativaRecusa(e.target.value)}
+                          className="mt-2 text-sm min-h-[80px] border-red-200 focus:border-red-400"
+                        />
+                        <div className="flex justify-end gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setCheckSelecionado(null);
+                              setJustificativaRecusa('');
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={!justificativaRecusa.trim()}
+                            onClick={() => handleAlterarStatus(check.id, 'reprovado')}
+                          >
+                            Confirmar Recusa
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -291,12 +359,21 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cnpj">CNPJ *</Label>
-              <Input
-                id="cnpj"
-                placeholder="00.000.000/0000-00"
-                value={novoCnpj}
-                onChange={(e) => setNovoCnpj(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="cnpj"
+                  placeholder="00.000.000/0000-00"
+                  value={novoCnpj}
+                  onChange={(e) => setNovoCnpj(e.target.value)}
+                  maxLength={18}
+                />
+                {isConsultando && (
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-pulse" />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Digite o CNPJ completo para buscar dados automaticamente
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo de Entidade *</Label>
@@ -305,27 +382,30 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {tipoEntidadeOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  {tipoEntidadeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="nome">Nome/Razão Social (opcional)</Label>
+            <Label htmlFor="nome">Nome/Razão Social</Label>
             <Input
               id="nome"
               placeholder="Nome da entidade"
               value={novoNome}
               onChange={(e) => setNovoNome(e.target.value)}
             />
+            {cnpjData && (
+              <p className="text-xs text-green-600">
+                ✓ Dados carregados automaticamente da consulta CNPJ
+              </p>
+            )}
           </div>
-          <Button 
-            onClick={handleAdicionarCnpj}
-            disabled={createCheck.isPending}
-            className="w-full sm:w-auto"
-          >
+          <Button onClick={handleAdicionarCnpj} disabled={createCheck.isPending} className="w-full sm:w-auto">
             {createCheck.isPending ? 'Adicionando...' : 'Adicionar CNPJ'}
           </Button>
         </CardContent>
