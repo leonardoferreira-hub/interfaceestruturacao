@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +7,7 @@ import {
   Plus, 
   Loader2,
   User,
-  Building,
-  FileText
+  Building
 } from 'lucide-react';
 import { useSeries } from '@/hooks/useEmissoes';
 import { useAlocacoesPorEmissao } from '@/hooks/useInvestidores';
@@ -19,12 +19,14 @@ import {
 import { formatCurrency } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { InvestidorDocumentos } from '../InvestidorDocumentos';
+import { NovaAlocacaoDrawer } from '../NovaAlocacaoDrawer';
 
 interface InvestidoresTabProps {
   idEmissao: string;
 }
 
 export function InvestidoresTab({ idEmissao }: InvestidoresTabProps) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data: series, isLoading: seriesLoading } = useSeries(idEmissao);
   const seriesIds = series?.map(s => s.id) || [];
   const { data: alocacoes, isLoading: alocacoesLoading } = useAlocacoesPorEmissao(idEmissao, seriesIds);
@@ -58,7 +60,7 @@ export function InvestidoresTab({ idEmissao }: InvestidoresTabProps) {
             Total alocado: {formatCurrency(totalGeralAlocado)}
           </p>
         </div>
-        <Button size="sm" disabled>
+        <Button size="sm" onClick={() => setDrawerOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Nova Alocação
         </Button>
@@ -160,6 +162,13 @@ export function InvestidoresTab({ idEmissao }: InvestidoresTabProps) {
           ))}
         </div>
       )}
+
+      {/* Drawer para nova alocação */}
+      <NovaAlocacaoDrawer
+        idEmissao={idEmissao}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }
