@@ -10,8 +10,8 @@
 -- Estas são referências - aplicar no painel Storage > Policies
 
 /*
-Bucket name: investidor-documentos
-Public: false (ou true se quiser URLs públicas)
+Bucket name: Investidores
+Public: true
 
 Políticas necessárias:
 
@@ -19,17 +19,17 @@ Políticas necessárias:
    Name: Allow authenticated reads
    Allowed operation: SELECT
    Target roles: authenticated
-   USING expression: true
+   USING expression: bucket_id = 'Investidores'
 
 2. INSERT policy:
    Name: Allow authenticated uploads
    Allowed operation: INSERT
    Target roles: authenticated
-   WITH CHECK expression: true
+   WITH CHECK expression: bucket_id = 'Investidores'
 
 3. DELETE policy:
    Name: Allow authenticated deletes
    Allowed operation: DELETE
    Target roles: authenticated
-   USING expression: true
+   USING expression: bucket_id = 'Investidores'
 */

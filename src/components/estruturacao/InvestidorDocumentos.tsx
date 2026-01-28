@@ -75,7 +75,7 @@ export function InvestidorDocumentos({ idInvestidor, isCompliance = false }: Inv
       const fileName = `${idInvestidor}/${tipo}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError, data } = await supabase.storage
-        .from('investidor-documentos')
+        .from('Investidores')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true,
@@ -83,7 +83,7 @@ export function InvestidorDocumentos({ idInvestidor, isCompliance = false }: Inv
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('investidor-documentos').getPublicUrl(fileName);
+      const { data: urlData } = supabase.storage.from('Investidores').getPublicUrl(fileName);
 
       await uploadDoc.mutateAsync({
         id_investidor: idInvestidor,
