@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -13,7 +12,6 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   useComplianceChecks,
   useCreateComplianceCheck,
-  useUpdateComplianceStatus,
   useDeleteComplianceCheck,
   useOperacaoComplianceCompleto,
 } from '@/hooks/useCompliance';
@@ -23,7 +21,6 @@ import { toast } from 'sonner';
 interface ComplianceTabProps {
   operacaoId: string;
   emissaoComercialId?: string;
-  isComplianceUser?: boolean;
 }
 
 const statusConfig = {
@@ -41,11 +38,10 @@ const tipoEntidadeOptions = [
   { value: 'outro', label: 'Outro' },
 ];
 
-export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser = false }: ComplianceTabProps) {
+export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabProps) {
   const { data: checks, isLoading } = useComplianceChecks(operacaoId);
   const { data: isCompleto } = useOperacaoComplianceCompleto(operacaoId);
   const createCheck = useCreateComplianceCheck();
-  const updateStatus = useUpdateComplianceStatus();
   const deleteCheck = useDeleteComplianceCheck();
   const { consultar, isLoading: isConsultando, data: cnpjData } = useConsultaCNPJ();
 
@@ -68,8 +64,6 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
   const [novoCnpj, setNovoCnpj] = useState('');
   const [novoTipo, setNovoTipo] = useState('outro');
   const [novoNome, setNovoNome] = useState('');
-  const [justificativaRecusa, setJustificativaRecusa] = useState('');
-  const [checkSelecionado, setCheckSelecionado] = useState<string | null>(null);
 
   // Consultar CNPJ automaticamente quando o usuário termina de digitar
   useEffect(() => {
@@ -81,7 +75,7 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
             setNovoNome(data.razao_social);
           }
         });
-      }, 500); // Debounce de 500ms
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [novoCnpj, consultar]);
@@ -110,29 +104,6 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
       setNovoTipo('outro');
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao adicionar CNPJ');
-    }
-  };
-
-  const handleAlterarStatus = async (checkId: string, novoStatus: string) => {
-    // Se for reprovar, precisa de justificativa
-    if (novoStatus === 'reprovado' && checkId !== checkSelecionado) {
-      setCheckSelecionado(checkId);
-      setJustificativaRecusa('');
-      return;
-    }
-
-    try {
-      await updateStatus.mutateAsync({
-        id: checkId,
-        operacao_id: operacaoId,
-        status: novoStatus as any,
-        observacoes: novoStatus === 'reprovado' ? justificativaRecusa : undefined,
-      });
-      toast.success('Status atualizado');
-      setCheckSelecionado(null);
-      setJustificativaRecusa('');
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao atualizar status');
     }
   };
 
@@ -178,7 +149,7 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
           <p className="text-sm text-muted-foreground">
             {isCompleto
               ? 'Todos os CNPJs foram verificados e aprovados.'
-              : 'Existem CNPJs pendentes de verificação.'}
+              : 'Existem CNPJs pendentes de verificação pelo time de Compliance.'}
           </p>
           <div className="mt-3 flex gap-2 text-xs">
             <Badge variant="outline">{checks?.length || 0} total</Badge>
@@ -187,6 +158,9 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
             </Badge>
             <Badge variant="outline" className="text-amber-600">
               {checks?.filter((c) => c.status === 'pendente').length || 0} pendentes
+            </Badge>
+            <Badge variant="outline" className="text-red-600">
+              {checks?.filter((c) => c.status === 'reprovado').length || 0} reprovados
             </Badge>
           </div>
         </CardContent>
@@ -233,9 +207,14 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
 
       <Separator />
 
-      {/* Lista de CNPJs para Compliance */}
+      {/* Lista de CNPJs - APENAS VISUALIZAÇÃO */}
       <div className="space-y-4">
-        <h3 className="text-sm font-medium">CNPJs em Verificação</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">CNPJs em Verificação</h3>
+          <p className="text-xs text-muted-foreground text-amber-600">
+            Somente o time de Compliance pode alterar status
+          </p>
+        </div>
 
         {checks?.length === 0 ? (
           <Card className="bg-muted/50">
@@ -250,7 +229,6 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
             {checks?.map((check) => {
               const status = statusConfig[check.status];
               const StatusIcon = status.icon;
-              const isReprovando = checkSelecionado === check.id;
 
               return (
                 <Card key={check.id} className={check.status === 'reprovado' ? 'border-red-200' : ''}>
@@ -269,74 +247,22 @@ export function ComplianceTab({ operacaoId, emissaoComercialId, isComplianceUser
                           {check.nome_entidade && <p className="font-medium text-foreground">{check.nome_entidade}</p>}
                           {check.observacoes && (
                             <p className="text-red-600 bg-red-50 p-2 rounded mt-2">
-                              <strong>Justificativa:</strong> {check.observacoes}
+                              <strong>Justificativa do Compliance:</strong> {check.observacoes}
                             </p>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end gap-2">
-                        <Select
-                          value={check.status}
-                          onValueChange={(v) => handleAlterarStatus(check.id, v)}
-                        >
-                          <SelectTrigger className="w-36 h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pendente">Pendente</SelectItem>
-                            <SelectItem value="em_analise">Em Análise</SelectItem>
-                            <SelectItem value="aprovado">Aprovado</SelectItem>
-                            <SelectItem value="reprovado">Reprovado</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemover(check.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemover(check.id)}
+                        title="Remover CNPJ"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-
-                    {/* Campo de justificativa para recusa */}
-                    {isReprovando && (
-                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <Label htmlFor={`justificativa-${check.id}`} className="text-red-700 text-xs font-medium">
-                          Justificativa da Recusa (obrigatório)
-                        </Label>
-                        <Textarea
-                          id={`justificativa-${check.id}`}
-                          placeholder="Informe o motivo da recusa..."
-                          value={justificativaRecusa}
-                          onChange={(e) => setJustificativaRecusa(e.target.value)}
-                          className="mt-2 text-sm min-h-[80px] border-red-200 focus:border-red-400"
-                        />
-                        <div className="flex justify-end gap-2 mt-3">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setCheckSelecionado(null);
-                              setJustificativaRecusa('');
-                            }}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={!justificativaRecusa.trim()}
-                            onClick={() => handleAlterarStatus(check.id, 'reprovado')}
-                          >
-                            Confirmar Recusa
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               );
