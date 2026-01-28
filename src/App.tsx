@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Pendencias from "./pages/Pendencias";
 import Historico from "./pages/Historico";
 import Dashboard from "./pages/Dashboard";
+import Compliance from "./pages/Compliance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/pendencias" element={<Pendencias />} />
           <Route path="/historico" element={<Historico />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/compliance" element={<Compliance />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

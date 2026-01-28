@@ -6,6 +6,7 @@ import {
   History,
   BarChart3,
   Menu,
+  ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { ThemeToggle } from './theme-toggle';
 const navItems = [
   { path: '/', label: 'Emissões', icon: FileText },
   { path: '/pendencias', label: 'Pendências', icon: Clock },
+  { path: '/compliance', label: 'Compliance', icon: ShieldCheck },
   { path: '/historico', label: 'Histórico', icon: History },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
 ];

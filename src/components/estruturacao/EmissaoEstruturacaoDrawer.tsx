@@ -11,7 +11,8 @@ import {
   Calendar,
   Building2,
   Banknote,
-  History
+  History,
+  ShieldCheck
 } from 'lucide-react';
 import type { EmissaoDB } from '@/types/database';
 import { DocumentosTab } from './tabs/DocumentosTab';
@@ -21,18 +22,21 @@ import { HistoricoAlteracoesTab } from './tabs/HistoricoAlteracoesTab';
 import { InformacoesTab } from './tabs/InformacoesTab';
 import { SeriesTab } from './tabs/SeriesTab';
 import { DespesasTab } from './tabs/DespesasTab';
+import { ComplianceTab } from './tabs/ComplianceTab';
 import { formatCurrency } from '@/utils/formatters';
 
 interface EmissaoEstruturacaoDrawerProps {
   emissao: EmissaoDB | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: string;
 }
 
 export function EmissaoEstruturacaoDrawer({
   emissao,
   open,
   onOpenChange,
+  initialTab = 'informacoes',
 }: EmissaoEstruturacaoDrawerProps) {
   if (!emissao) return null;
 
@@ -112,7 +116,7 @@ export function EmissaoEstruturacaoDrawer({
         </SheetHeader>
 
         {/* Mobile: tabs em linha com scroll horizontal (evita quebrar layout) */}
-        <Tabs defaultValue="informacoes" className="flex flex-col h-[calc(100dvh-140px)] min-h-0">
+        <Tabs defaultValue={initialTab} className="flex flex-col h-[calc(100dvh-140px)] min-h-0">
           <div className="relative px-4 sm:px-6 mt-4">
             {/* fade à direita pra indicar scroll horizontal no mobile */}
             <div
@@ -146,6 +150,10 @@ export function EmissaoEstruturacaoDrawer({
             <TabsTrigger value="historico" className="gap-2">
               <History className="h-4 w-4" />
               Histórico
+            </TabsTrigger>
+            <TabsTrigger value="compliance" className="gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Compliance
             </TabsTrigger>
           </TabsList>
           </div>
@@ -210,6 +218,19 @@ export function EmissaoEstruturacaoDrawer({
                 transition={{ duration: 0.3 }}
               >
                 <HistoricoAlteracoesTab idEmissao={emissaoComercialId} />
+              </motion.div>
+            </TabsContent>
+            <TabsContent value="compliance" className="mt-0">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ComplianceTab 
+                  operacaoId={(emissao as any).id || emissao.id} 
+                  emissaoComercialId={emissaoComercialId}
+                />
               </motion.div>
             </TabsContent>
           </div>
