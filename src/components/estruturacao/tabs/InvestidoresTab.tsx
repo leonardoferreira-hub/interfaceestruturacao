@@ -118,8 +118,25 @@ export function InvestidoresTab({ idEmissao, numeroEmissao }: InvestidoresTabPro
       const link = `${baseUrl}/cadastro-investidores/${idEmissao}`;
       setLinkGerado(link);
       
-      await navigator.clipboard.writeText(link);
-      toast.success('Link copiado! Envie para o cliente preencher.');
+      // Tentar copiar com fallback
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(link);
+        } else {
+          const textArea = document.createElement('textarea');
+          textArea.value = link;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-9999px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+        }
+        toast.success('Link gerado e copiado! Envie para o cliente preencher.');
+      } catch (copyErr) {
+        toast.success('Link gerado! Copie o link acima.');
+      }
     } catch (err) {
       toast.error('Erro ao gerar link');
     } finally {
@@ -127,9 +144,27 @@ export function InvestidoresTab({ idEmissao, numeroEmissao }: InvestidoresTabPro
     }
   };
 
-  const copiarLink = () => {
-    navigator.clipboard.writeText(linkGerado);
-    toast.success('Link copiado!');
+  const copiarLink = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(linkGerado);
+        toast.success('Link copiado!');
+      } else {
+        // Fallback para HTTP ou contextos sem clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = linkGerado;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        toast.success('Link copiado!');
+      }
+    } catch (err) {
+      toast.error('Não foi possível copiar. Selecione e copie manualmente.');
+    }
   };
 
   const prontosParaIntegralizar = investidores?.filter(
