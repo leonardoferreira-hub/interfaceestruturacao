@@ -118,10 +118,6 @@ export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabP
     }
   };
 
-  const formatarCNPJ = (cnpj: string) => {
-    return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -302,6 +298,11 @@ export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabP
     </div>
   );
 }
+
+// Função utilitária para formatar CNPJ
+const formatarCNPJ = (cnpj: string) => {
+  return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+};
 
 // Componente para mostrar CNPJ com status do Compliance externo
 function CNPJCard({ check, onRemover }: { check: any; onRemover: (id: string) => void }) {
