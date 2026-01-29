@@ -17,6 +17,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Status config
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -88,17 +89,16 @@ function useInvestidoresEmissao(emissaoId: string | undefined) {
     queryFn: async () => {
       if (!emissaoId) return [];
       
-      const response = await fetch(
-        `https://gthtvpujwukbfgokghne.supabase.co/rest/v1/v_investidores_emissao?emissao_id=eq.${emissaoId}&order=criado_em.asc`,
-        {
-          headers: {
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0aHR2cHVqd3VrYmZnb2tnaG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgwMTg0MjYsImV4cCI6MjA1MzU5NDQyNn0.yJ7w4e2LgK-_I4dI6rkQNXEY0Rdrf7jC_FvyX5LsQp0',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0aHR2cHVqd3VrYmZnb2tnaG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgwMTg0MjYsImV4cCI6MjA1MzU5NDQyNn0.yJ7w4e2LgK-_I4dI6rkQNXEY0Rdrf7jC_FvyX5LsQp0'
-          }
-        }
-      );
-      if (!response.ok) throw new Error('Erro ao buscar investidores');
-      return response.json() as InvestidorEmissao[];
+      const { data, error } = await supabase.rpc('get_investidores_emissao', {
+        p_emissao_id: emissaoId
+      });
+      
+      if (error) {
+        console.error('Erro ao buscar investidores:', error);
+        throw new Error('Erro ao buscar investidores: ' + error.message);
+      }
+      
+      return (data || []) as InvestidorEmissao[];
     },
     enabled: !!emissaoId,
     refetchInterval: 5000, // Atualiza a cada 5 segundos
