@@ -62,6 +62,49 @@ export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabP
     enabled: !!emissaoComercialId,
   });
 
+  // Buscar status do compliance do CNPJ principal
+  const { data: cnpjPrincipalStatus } = useQuery({
+    queryKey: ['cnpj-principal-status', emissaoMeta?.empresa_cnpj],
+    queryFn: async () => {
+      if (!emissaoMeta?.empresa_cnpj) return null;
+      
+      // Buscar na view do compliance
+      const { data, error } = await supabase
+        .from('v_compliance_verificacoes')
+        .select('status, cnpj, nome_entidade')
+        .eq('cnpj', emissaoMeta.empresa_cnpj.replace(/\D/g, ''))
+        .order('data_solicitacao', { ascending: false })
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      // Se não encontrou em verificações pendentes, buscar no histórico
+      if (!data) {
+        const { data: historico, error: errHistorico } = await supabase
+          .from('cnpjs_verificados')
+          .select('status_compliance, cnpj, razao_social')
+          .eq('cnpj', emissaoMeta.empresa_cnpj.replace(/\D/g, ''))
+          .maybeSingle();
+        
+        if (errHistorico) throw errHistorico;
+        
+        if (historico) {
+          return {
+            status: historico.status_compliance,
+            cnpj: historico.cnpj,
+            nome_entidade: historico.razao_social
+          };
+        }
+        
+        return null;
+      }
+      
+      return data;
+    },
+    enabled: !!emissaoMeta?.empresa_cnpj,
+    refetchInterval: 5000, // Atualiza a cada 5 segundos
+  });
+
   const [novoCnpj, setNovoCnpj] = useState('');
   const [novoTipo, setNovoTipo] = useState('outro');
   const [novoNome, setNovoNome] = useState('');
@@ -180,23 +223,50 @@ export function ComplianceTab({ operacaoId, emissaoComercialId }: ComplianceTabP
                   <p className="text-sm text-muted-foreground">{emissaoMeta.empresa_razao_social}</p>
                 )}
               </div>
-              {checks?.some((c) => c.cnpj === emissaoMeta.empresa_cnpj) ? (
-                <Badge variant="outline" className="text-green-600">
-                  Já adicionado
-                </Badge>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setNovoCnpj(emissaoMeta.empresa_cnpj!);
-                    setNovoTipo('emitente');
-                    setNovoNome(emissaoMeta.empresa_razao_social || '');
-                  }}
-                >
-                  Adicionar
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {cnpjPrincipalStatus && (
+                  <Badge 
+                    variant="outline" 
+                    className={
+                      cnpjPrincipalStatus.status === 'aprovado' 
+                        ? 'bg-green-100 text-green-700 border-green-200' 
+                        : cnpjPrincipalStatus.status === 'reprovado'
+                        ? 'bg-red-100 text-red-700 border-red-200'
+                        : cnpjPrincipalStatus.status === 'em_analise'
+                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                        : 'bg-amber-100 text-amber-700 border-amber-200'
+                    }
+                  >
+                    {cnpjPrincipalStatus.status === 'aprovado' && <CheckCircle className="h-3 w-3 mr-1" />}
+                    {cnpjPrincipalStatus.status === 'reprovado' && <XCircle className="h-3 w-3 mr-1" />}
+                    {cnpjPrincipalStatus.status === 'em_analise' && <Clock className="h-3 w-3 mr-1" />}
+                    {cnpjPrincipalStatus.status === 'aprovado' 
+                      ? 'Aprovado no Compliance' 
+                      : cnpjPrincipalStatus.status === 'reprovado'
+                      ? 'Reprovado'
+                      : cnpjPrincipalStatus.status === 'em_analise'
+                      ? 'Em Análise'
+                      : 'Aguardando Compliance'}
+                  </Badge>
+                )}
+                {checks?.some((c) => c.cnpj === emissaoMeta.empresa_cnpj?.replace(/\D/g, '')) ? (
+                  <Badge variant="outline" className="text-green-600">
+                    Já adicionado
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setNovoCnpj(emissaoMeta.empresa_cnpj!);
+                      setNovoTipo('emitente');
+                      setNovoNome(emissaoMeta.empresa_razao_social || '');
+                    }}
+                  >
+                    Adicionar
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
