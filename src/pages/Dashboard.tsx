@@ -38,12 +38,13 @@ const Dashboard = () => {
     }, [] as { name: string; value: number }[]);
   }, [emissoes]);
 
-  const stats = [
+  // Stats memoizado para evitar recriação a cada render
+  const stats = useMemo(() => [
     { label: 'Total Emissões', value: formatNumber(metrics.total_emissoes), icon: TrendingUp, color: 'text-blue-600' },
     { label: 'Valor Total', value: formatCurrencyCompact(metrics.valor_total_emitido), icon: DollarSign, color: 'text-green-600' },
     { label: 'Pendências Abertas', value: formatNumber(metrics.pendencias_abertas), icon: AlertTriangle, color: 'text-yellow-600' },
     { label: 'Taxa SLA', value: formatPercent(metrics.taxa_conclusao_sla), icon: CheckCircle, color: 'text-emerald-600' },
-  ];
+  ], [metrics]);
 
   if (isLoading) {
     return (

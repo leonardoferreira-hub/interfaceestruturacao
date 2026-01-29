@@ -114,28 +114,96 @@ export function InvestidoresTab({ idEmissao, numeroEmissao }: InvestidoresTabPro
   const gerarLink = async () => {
     setGerandoLink(true);
     try {
-      const baseUrl = 'http://100.91.53.76:5176';
+      const baseUrl = 'http://100.91.53.76:8084';
       const link = `${baseUrl}/cadastro-investidores/${idEmissao}`;
       setLinkGerado(link);
       
-      // Tentar copiar com fallback
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
+      // Pequeno delay para garantir que o estado foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Tentar copiar com múltiplos fallbacks
+      let copiado = false;
+      
+      // Método 1: Clipboard API moderna
+      if (!copiado && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
           await navigator.clipboard.writeText(link);
-        } else {
+          copiado = true;
+          console.log('✅ Copiado via Clipboard API');
+        } catch (err) {
+          console.log('❌ Clipboard API falhou:', err);
+        }
+      }
+      
+      // Método 2: execCommand com textarea
+      if (!copiado) {
+        try {
           const textArea = document.createElement('textarea');
           textArea.value = link;
-          textArea.style.position = 'fixed';
-          textArea.style.left = '-9999px';
+          textArea.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
           document.body.appendChild(textArea);
           textArea.focus();
           textArea.select();
-          document.execCommand('copy');
+          const resultado = document.execCommand('copy');
           document.body.removeChild(textArea);
+          if (resultado) {
+            copiado = true;
+            console.log('✅ Copiado via execCommand');
+          }
+        } catch (err) {
+          console.log('❌ execCommand falhou:', err);
         }
-        toast.success('Link gerado e copiado! Envie para o cliente preencher.');
-      } catch (copyErr) {
-        toast.success('Link gerado! Copie o link acima.');
+      }
+      
+      // Método 3: Selecionar e copiar o texto do input
+      if (!copiado) {
+        try {
+          // Criar um input temporário visível
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = link;
+          input.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;padding:10px;z-index:9999;border:2px solid #3b82f6;border-radius:8px;font-size:14px;';
+          input.readOnly = true;
+          document.body.appendChild(input);
+          input.select();
+          input.setSelectionRange(0, 99999); // Para mobile
+          const resultado = document.execCommand('copy');
+          document.body.removeChild(input);
+          if (resultado) {
+            copiado = true;
+            console.log('✅ Copiado via input visível');
+          }
+        } catch (err) {
+          console.log('❌ Input visível falhou:', err);
+        }
+      }
+      
+      if (copiado) {
+        toast.success('✅ Link copiado! Cole no WhatsApp/email do cliente.');
+      } else {
+        toast.warning('⚠️ Não foi possível copiar automaticamente. Selecione e copie manualmente.');
+        // Mostrar o input para cópia manual
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = link;
+        input.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;max-width:400px;padding:15px;z-index:9999;border:2px solid #3b82f6;border-radius:8px;font-size:16px;box-shadow:0 10px 40px rgba(0,0,0,0.3);';
+        input.readOnly = true;
+        input.onclick = () => {
+          input.select();
+          toast.info('Link selecionado! Use Ctrl+C para copiar.');
+        };
+        document.body.appendChild(input);
+        input.select();
+        
+        // Remover após 10 segundos ou clique fora
+        const remover = () => {
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
+          document.removeEventListener('click', remover);
+        };
+        setTimeout(remover, 10000);
+        document.addEventListener('click', remover);
       }
     } catch (err) {
       toast.error('Erro ao gerar link');
