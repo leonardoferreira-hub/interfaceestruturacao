@@ -253,50 +253,54 @@ const Index = () => {
                           <button
                             type="button"
                             onClick={() => handleRowClick(operacao)}
-                            className="group w-full text-left rounded-lg border border-border/70 bg-background p-4 space-y-3 active:bg-muted/40 hover:border-muted-foreground/30 transition-colors"
+                            className="group w-full text-left rounded-xl border border-border/50 bg-card p-4 shadow-sm active:bg-muted/30 hover:shadow-md hover:border-border transition-all"
                           >
+                            {/* Header: Nome + Valor */}
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold truncate">
-                                  {operacao.nome_operacao || 'Operação'}
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
+                                <h3 className="font-semibold text-foreground truncate">
+                                  {operacao.nome_operacao || 'Sem nome'}
+                                </h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   {operacao.numero_emissao}
-                                  {operacao.categoria_nome ? ` • ${operacao.categoria_nome}` : ''}
-                                  {operacao.veiculo_nome ? ` • ${operacao.veiculo_nome}` : ''}
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <CategoriaPill code={operacao.categoria_nome} />
-                                  {operacao.veiculo_nome ? (
-                                    <Badge variant="secondary" className="rounded-full">
-                                      {operacao.veiculo_nome}
-                                    </Badge>
-                                  ) : null}
-                                </div>
+                                </p>
                               </div>
-                              <div className="shrink-0 text-sm font-semibold tabular-nums">
-                                {formatCurrency(operacao.volume || 0)}
+                              <div className="text-right">
+                                <div className="font-semibold text-foreground tabular-nums">
+                                  {formatCurrency(operacao.volume || 0)}
+                                </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs text-muted-foreground truncate">
-                                PMO: {operacao.pmo_nome || 'Não atribuído'}
-                              </div>
-                              <div className="flex items-center gap-1">
+                            {/* Tags: Categoria + Veículo */}
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                              <CategoriaPill code={operacao.categoria_nome} />
+                              {operacao.veiculo_nome && (
+                                <Badge variant="outline" className="rounded-full text-xs font-normal bg-muted/50">
+                                  {operacao.veiculo_nome}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Footer: PMO + Ações */}
+                            <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">
+                                {operacao.pmo_nome || 'Sem PMO'}
+                              </span>
+                              <div className="flex items-center gap-0.5">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
-                                  title="Exportar emissão em Excel"
+                                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                  title="Exportar Excel"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleExportEmissao(operacao);
                                   }}
                                 >
-                                  <Download className="h-4 w-4" />
+                                  <Download className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleRowClick(operacao); }}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); handleRowClick(operacao); }}>
                                   <ArrowUpRight className="h-4 w-4" />
                                 </Button>
                               </div>
