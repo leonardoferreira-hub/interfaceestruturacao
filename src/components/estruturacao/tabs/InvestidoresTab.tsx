@@ -114,7 +114,7 @@ export function InvestidoresTab({ idEmissao, numeroEmissao }: InvestidoresTabPro
   const gerarLink = async () => {
     setGerandoLink(true);
     try {
-      const baseUrl = 'http://100.91.53.76:8084';
+      const baseUrl = import.meta.env.VITE_COMPLIANCE_URL || 'https://interfacecompliance.lovable.app';
       const link = `${baseUrl}/cadastro-investidores/${idEmissao}`;
       setLinkGerado(link);
       
